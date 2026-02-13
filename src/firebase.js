@@ -13,9 +13,10 @@ import {
   updateDoc,
   getDoc,
   setDoc,
-  writeBatch, // New
-  where,      // New
-  getDocs     // New
+  writeBatch,
+  where,
+  getDocs,
+  serverTimestamp
 } from "firebase/firestore";
 
 // --- PASTE YOUR FIREBASE CONFIG OBJECT BELOW ---
@@ -38,5 +39,5 @@ const provider = new GoogleAuthProvider();
 export { 
   db, auth, provider, signInWithPopup, signOut, 
   collection, addDoc, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, 
-  getDoc, setDoc, writeBatch, where, getDocs 
+  getDoc, setDoc, writeBatch, where, getDocs, serverTimestamp 
 };

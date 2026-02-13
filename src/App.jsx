@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as XLSX from 'xlsx';
-import { db, auth, provider, signInWithPopup, signOut, collection, addDoc, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, setDoc, writeBatch, where, getDocs } from './firebase';
+import { db, auth, provider, signInWithPopup, signOut, collection, addDoc, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, setDoc, writeBatch, where, getDocs, serverTimestamp } from './firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { 
   LayoutDashboard, PlusCircle, History, LogOut, 
@@ -94,6 +94,9 @@ function App() {
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [transactions, setTransactions] = useState([]);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [expandedLogs, setExpandedLogs] = useState({});
+  const [manageSearch, setManageSearch] = useState('');
   const [loading, setLoading] = useState(false);
   
   // Dashboard & Graph
@@ -177,6 +180,7 @@ function App() {
       setUser(u);
       if (u) {
           listenToTransactions(u.uid);
+          listenToActivityLogs(u.uid);
           try {
             const settingsDoc = await getDoc(doc(db, "users", u.uid, "settings", "preferences"));
             if (settingsDoc.exists()) {
@@ -211,7 +215,32 @@ function App() {
     });
   };
 
+  const listenToActivityLogs = (uid) => {
+    const q = query(collection(db, "users", uid, "activity_logs"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+        setActivityLogs(snapshot.docs.slice(0, 50).map(doc => ({ ...doc.data(), id: doc.id })));
+    });
+  };
+
   const handleLogin = async () => { try { await signInWithPopup(auth, provider); } catch (e) { console.error(e); } };
+
+  // --- LOGGING ---
+  const logActivity = async (action, txId, description, changes = {}) => {
+    if (!user) return;
+    try {
+        await addDoc(collection(db, "users", user.uid, "activity_logs"), {
+            action,
+            transactionId: txId || 'N/A',
+            description,
+            changes,
+            timestamp: serverTimestamp(),
+            metadata: {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform
+            }
+        });
+    } catch (e) { console.error("Logging failed:", e); }
+  };
 
   // --- CRUD ---
   const handleSave = async (formData) => {
@@ -228,8 +257,17 @@ function App() {
       isExcluded: formData.isExcluded 
     };
     try {
-      if (formData.id) await updateDoc(doc(db, "users", user.uid, "transactions", formData.id), txData);
-      else await addDoc(collection(db, "users", user.uid, "transactions"), { ...txData, id: Date.now() });
+      if (formData.id) {
+          // Fetch old state for logging
+          const oldSnap = await getDoc(doc(db, "users", user.uid, "transactions", formData.id));
+          const oldData = oldSnap.exists() ? oldSnap.data() : {};
+          
+          await updateDoc(doc(db, "users", user.uid, "transactions", formData.id), txData);
+          logActivity('EDIT', formData.id, txData.description, { before: oldData, after: txData });
+      } else {
+          const docRef = await addDoc(collection(db, "users", user.uid, "transactions"), { ...txData, id: Date.now() });
+          logActivity('ADD', docRef.id, txData.description, { after: txData });
+      }
       setEditTx(null);
       if (!formData.id) setActiveTab('dashboard'); 
     } catch (e) { alert(e.message); }
@@ -240,9 +278,16 @@ function App() {
     setLoading(true);
     try {
         if (deleteConfirm.type === 'single') {
+            const oldSnap = await getDoc(doc(db, "users", user.uid, "transactions", deleteConfirm.id));
+            const oldData = oldSnap.exists() ? oldSnap.data() : {};
+            
             await deleteDoc(doc(db, "users", user.uid, "transactions", deleteConfirm.id));
+            logActivity('DELETE', deleteConfirm.id, oldData.description || 'Unknown', { before: oldData });
         } else if (deleteConfirm.type === 'group') {
-            for (const tx of deleteConfirm.group) await deleteDoc(doc(db, "users", user.uid, "transactions", tx.firestoreId));
+            for (const tx of deleteConfirm.group) {
+                await deleteDoc(doc(db, "users", user.uid, "transactions", tx.firestoreId));
+                logActivity('DELETE', tx.firestoreId, tx.description, { before: tx });
+            }
         } else if (deleteConfirm.type === 'range') {
             const q = query(
                 collection(db, "users", user.uid, "transactions"), 
@@ -251,7 +296,11 @@ function App() {
             );
             const snapshot = await getDocs(q);
             const batch = writeBatch(db);
-            snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            snapshot.docs.forEach(docSnap => {
+                const data = docSnap.data();
+                logActivity('DELETE', docSnap.id, data.description, { before: data });
+                batch.delete(docSnap.ref);
+            });
             await batch.commit();
         }
         setEditTx(null);
@@ -606,7 +655,7 @@ function App() {
     const isYearlyGranularity = graphGranularity === 'yearly'; 
     const isYearMode = viewMode === 'year'; 
 
-    if (isYearlyGranularity || (isYearMode && selectedYears.length > 1)) {
+    if (isYearlyGranularity || (viewMode === 'year' && selectedYears.length > 1)) {
         // Compare selected years
         const yearsToCompare = selectedYears.includes('All Years') 
             ? Array.from({length: 10}, (_, i) => now.getFullYear() - 5 + i)
@@ -640,7 +689,7 @@ function App() {
         });
     } else {
         // Standard Monthly View for a single year
-        if (isYearMode || selectedYears.length === 1) {
+        if (viewMode === 'year') {
             const yFocus = selectedYears[0];
             for (let i = 0; i < 12; i++) {
                 const d = new Date(yFocus, i, 1);
@@ -1257,21 +1306,77 @@ function App() {
 
                                         {/* CONSOLIDATED VIEW OVERLAY */}
                                         {viewMode === 'year' && (
-                                            <div className="absolute inset-0 z-[60] flex items-center justify-center p-10 bg-white/60 dark:bg-[#0a0a0a]/80 backdrop-blur-3xl animate-in fade-in duration-700 rounded-b-[3rem]">
-                                                <div className="text-center space-y-8 max-w-xs animate-in zoom-in slide-in-from-bottom-4 duration-1000">
-                                                    <div className="w-24 h-24 bg-blue-600 text-white rounded-[2.5rem] flex items-center justify-center mx-auto shadow-[0_20px_50px_rgba(37,99,235,0.4)] animate-pulse">
-                                                        <Database size={40} />
-                                                    </div>
-                                                    <div className="space-y-3">
-                                                        <h3 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Baseline <br/>Consolidated</h3>
+                                            <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center p-8 bg-white/90 dark:bg-[#0a0a0a]/95 backdrop-blur-3xl animate-in fade-in duration-700 rounded-b-[3rem] overflow-y-auto custom-scrollbar">
+                                                <div className="text-center space-y-6 w-full max-w-md animate-in zoom-in slide-in-from-bottom-4 duration-1000">
+                                                    <div className="space-y-2">
+                                                        <h3 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Baseline <br/><span className="text-blue-600">Consolidated.</span></h3>
                                                         <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] leading-relaxed">
-                                                            Indexing {selectedYears.includes('All Years') ? 'Full History' : selectedYears.length + ' Annual Streams'}
+                                                            {selectedYears.includes('All Years') ? 'Full Portfolio Archive' : `${selectedYears.join(' + ')} Aggregate Stream`}
                                                         </p>
                                                     </div>
-                                                    <div className="flex flex-col gap-3">
+
+                                                    {/* ANNUAL PIE MINI-VIEW */}
+                                                    <div className="relative h-64 w-full">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <PieChart>
+                                                                <Pie
+                                                                    data={pieData}
+                                                                    cx="50%"
+                                                                    cy="50%"
+                                                                    innerRadius="60%"
+                                                                    outerRadius="90%"
+                                                                    paddingAngle={4}
+                                                                    dataKey="value"
+                                                                    stroke="none"
+                                                                >
+                                                                    {pieData.map((entry, index) => (
+                                                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                                    ))}
+                                                                </Pie>
+                                                                <Tooltip 
+                                                                    content={({ active, payload }) => {
+                                                                        if (active && payload && payload.length) {
+                                                                            return (
+                                                                                <div className="bg-white dark:bg-[#111] p-3 rounded-xl shadow-2xl border border-gray-100 dark:border-white/10">
+                                                                                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">{payload[0].name}</p>
+                                                                                    <p className="text-sm font-black dark:text-white">{formatCurrency(payload[0].value)}</p>
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                        return null;
+                                                                    }}
+                                                                />
+                                                            </PieChart>
+                                                        </ResponsiveContainer>
+                                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Aggregate</p>
+                                                            <p className="text-xl font-black dark:text-white">{formatCurrency(spent)}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* TOP CATEGORIES LIST */}
+                                                    <div className="space-y-2 text-left">
+                                                        <p className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em] mb-3 text-center">Top Deployment Vectors</p>
+                                                        {pieData.slice(0, 4).map((entry, i) => (
+                                                            <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.fill }}></div>
+                                                                    <span className="text-[10px] font-black text-gray-600 dark:text-gray-300 uppercase tracking-widest truncate max-w-[120px]">{entry.name}</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-[9px] font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-600/10 px-2 py-0.5 rounded-lg">
+                                                                        {((entry.value / spent) * 100).toFixed(0)}%
+                                                                    </span>
+                                                                    <span className="text-xs font-black dark:text-white">{formatCurrency(entry.value)}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-3 pt-4">
                                                         <button 
                                                             onClick={() => setViewMode('month')}
-                                                            className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl"
+                                                            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-blue-600/20"
                                                         >
                                                             Restore Temporal Focus
                                                         </button>
@@ -1361,75 +1466,64 @@ function App() {
                 {activeTab === 'history' && (
                     <div className="space-y-12 animate-fade-in py-10 relative z-10">
                         <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-4 relative z-[100]">
-                            <div className="space-y-4">
-                                <h2 className="text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Chronicle <br/><span className="text-blue-600">Archive.</span></h2>
-                                <div className="flex items-center gap-3">
-                                    <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Stream: {selectedSource.includes('All Sources') ? 'Consolidated Archive' : selectedSource.join(' + ')}</span>
-                                    </div>
-                                </div>
-                                <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1">Historical Data Stream</p>
-                            </div>
-                            <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                                <div className="relative flex-1 md:w-80">
-                                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search archive matrix..." 
-                                        value={historySearch}
-                                        onChange={(e) => setHistorySearch(e.target.value)}
-                                        className="w-full pl-12 pr-4 py-4 bg-white dark:bg-white/[0.03] backdrop-blur-xl border border-gray-100 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-xl dark:text-white"
-                                    />
-                                    {historySearch && (
-                                        <button onClick={() => setHistorySearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors">
-                                            <X size={16} />
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-1.5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-inner transition-all group hover:border-blue-500/30">
-                                    <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
-                                        <CreditCard size={14} className="text-blue-600 dark:text-blue-400" />
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Source</span>
-                                    </div>
-                                    <MultiSelectDropdown 
-                                        options={['All Sources', ...allSources]} 
-                                        selected={selectedSource} 
-                                        onChange={setSelectedSource} 
-                                        label="" 
-                                    />
-                                </div>
-                                <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-2xl border border-gray-200 dark:border-white/5 shadow-inner transition-all">
-                                    <button 
-                                        onClick={() => setHistoryViewMode('list')}
-                                        className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-xl text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-                                    >
-                                        List View
-                                    </button>
-                                    <button 
-                                        onClick={() => setHistoryViewMode('calendar')}
-                                        className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'calendar' ? 'bg-white dark:bg-gray-600 shadow-xl text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-                                    >
-                                        Calendar View
-                                    </button>
-                                    <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
-                                    {historyViewMode === 'calendar' ? (
-                                        <CustomDropdown 
-                                            value={selectedYears[0]} 
-                                            onChange={(y) => setSelectedYears([y])} 
-                                            options={Array.from({length: 10}, (_, i) => ({ value: today.getFullYear() - 5 + i, label: (today.getFullYear() - 5 + i).toString() }))} 
-                                        />
-                                    ) : (
-                                        <MultiSelectDropdown 
-                                            options={['All Years', ...Array.from({length: 10}, (_, i) => today.getFullYear() - 5 + i)]} 
-                                            selected={selectedYears} 
-                                            onChange={setSelectedYears} 
-                                            label="" 
-                                        />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                                                        <div className="space-y-4">
+                                                            <h2 className="text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Chronicle <br/><span className="text-blue-600">Archive.</span></h2>
+                                                            {historyViewMode === 'calendar' && (
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
+                                                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Stream: {selectedSource.includes('All Sources') ? 'Consolidated Archive' : selectedSource.join(' + ')}</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1">Historical Data Stream</p>
+                                                        </div>
+                                                        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                                                            {historyViewMode === 'list' && (
+                                                                <div className="relative flex-1 md:w-80">
+                                                                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
+                                                                    <input 
+                                                                        type="text" 
+                                                                        placeholder="Search archive matrix..." 
+                                                                        value={historySearch}
+                                                                        onChange={(e) => setHistorySearch(e.target.value)}
+                                                                        className="w-full pl-12 pr-4 py-4 bg-white dark:bg-white/[0.03] backdrop-blur-xl border border-gray-100 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-xl dark:text-white"
+                                                                    />
+                                                                    {historySearch && (
+                                                                        <button onClick={() => setHistorySearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors">
+                                                                            <X size={16} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-1.5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-inner transition-all group hover:border-blue-500/30">
+                                                                <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
+                                                                    <CreditCard size={14} className="text-blue-600 dark:text-blue-400" />
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Source</span>
+                                                                </div>
+                                                                <MultiSelectDropdown 
+                                                                    options={['All Sources', ...allSources]} 
+                                                                    selected={selectedSource} 
+                                                                    onChange={setSelectedSource} 
+                                                                    label="" 
+                                                                />
+                                                            </div>
+                            
+                                                            <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-2xl border border-gray-200 dark:border-white/5 shadow-inner transition-all">                                                                <button 
+                                                                    onClick={() => setHistoryViewMode('list')}
+                                                                    className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-xl text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                                                                >
+                                                                    List View
+                                                                </button>
+                                                                <button 
+                                                                    onClick={() => setHistoryViewMode('calendar')}
+                                                                    className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'calendar' ? 'bg-white dark:bg-gray-600 shadow-xl text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
+                                                                >
+                                                                    Calendar View
+                                                                </button>
+                                                            </div>
+                                                        </div>                        </div>
 
                         {historyViewMode === 'calendar' ? (
                             <div className="relative group/cal">
@@ -1942,162 +2036,234 @@ function App() {
             </Popup>
         )}
 
-        {/* MANAGE MODAL (Categories, Sources, Tags) */}
-        {showManageModal && (
-            <Popup title="Control Center" onClose={() => setShowManageModal(null)} zIndex={600}>
-                <div className="flex gap-6 border-b dark:border-white/5 mb-8 pb-4">
-                    {['category', 'source', 'tags'].map(tab => (
-                        <button 
-                            key={tab} 
-                            onClick={() => { setManageTab(tab); setEditingItem(null); }}
-                            className={`text-[10px] font-black uppercase tracking-[0.2em] transition-all pb-4 relative ${manageTab === tab ? 'text-blue-600' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-                        >
-                            {tab === 'category' ? 'Vectors' : (tab === 'source' ? 'Sources' : 'Metadata')}
-                            {manageTab === tab && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)]"></div>}
-                        </button>
-                    ))}
-                </div>
-                
-                <div className="space-y-6">
-                     {/* ADD NEW INPUT */}
-                     {!editingItem && (
-                         <div className="flex gap-3">
-                            <input id="newItemInput" placeholder={`Initialize new ${manageTab}...`} className="flex-1 bg-gray-50 dark:bg-white/5 px-5 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none border border-transparent focus:border-blue-500/30 transition-all dark:text-white shadow-inner"/>
-                            <button onClick={() => {
-                                const val = document.getElementById('newItemInput').value;
-                                if(val) alert(`Protocol: To add "${val}", simply assign it to a new entry. It will be indexed automatically.`);
-                            }} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-blue-600/20 hover:scale-105 transition-all"><Plus size={16}/></button>
-                         </div>
-                     )}
+        {/* SOPHISTICATED CONTROL CENTER (z-600) */}
+        {showManageModal && (() => {
+            const tabs = [
+                { id: 'category', label: 'Vectors', icon: <Layers size={18} /> },
+                { id: 'source', label: 'Sources', icon: <CreditCard size={18} /> },
+                { id: 'tags', label: 'Metadata', icon: <Hash size={18} /> },
+                { id: 'audit', label: 'Audit Log', icon: <History size={18} /> }
+            ];
 
-                    {/* CONTENT LIST */}
-                    <div className="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
-                        {manageTab === 'category' && allCategories.map(cat => {
-                            const isEditing = editingItem && editingItem.type === 'category' && editingItem.original === cat;
-                            if (isEditing) {
-                                return (
-                                    <div key={cat} className="flex gap-3 bg-blue-50 dark:bg-blue-600/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-600/30">
-                                        <div className="relative group">
-                                            <button 
-                                                onClick={() => setIconPickerOpen(iconPickerOpen === cat ? null : cat)}
-                                                className="w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-800 text-blue-600 shadow-xl"
-                                            >
-                                                {getCategoryIcon(editingItem.icon || cat, 20, categoryIcons)}
-                                            </button>
-                                            
-                                            {iconPickerOpen === cat && (
-                                                <div className="absolute top-full left-0 mt-3 bg-white dark:bg-[#0a0a0a] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/10 rounded-2xl w-72 p-4 grid grid-cols-6 gap-2 z-[9999] h-56 overflow-y-auto custom-scrollbar">
-                                                    {AVAILABLE_ICONS.map(iconKey => {
-                                                        const IconCmp = ICON_MAP[iconKey];
-                                                        return (
-                                                            <button 
-                                                                key={iconKey} 
-                                                                onClick={() => {
-                                                                    setEditingItem(prev => ({ ...prev, icon: iconKey }));
-                                                                    setIconPickerOpen(null);
-                                                                }} 
-                                                                className="p-2.5 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl flex justify-center transition-all hover:scale-110"
-                                                            >
-                                                                <IconCmp size={18} className="text-gray-600 dark:text-gray-400 hover:text-blue-600" />
-                                                            </button>
-                                                        );
-                                                    })}
+            return (
+                <Popup title="Control Center" onClose={() => setShowManageModal(null)} zIndex={600} size="xl" fullHeight>
+                    <div className="flex h-[650px] overflow-hidden">
+                        {/* LEFT SIDEBAR NAVIGATION */}
+                        <div className="w-64 bg-gray-50/50 dark:bg-white/[0.02] border-r dark:border-white/5 flex flex-col p-6 gap-2 shrink-0">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4 ml-2">Navigation</p>
+                            {tabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => { setManageTab(tab.id); setEditingItem(null); setManageSearch(''); }}
+                                    className={`flex items-center gap-4 px-5 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 relative group ${manageTab === tab.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20 translate-x-2' : 'text-gray-500 hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200'}`}
+                                >
+                                    {tab.icon}
+                                    <span>{tab.label}</span>
+                                    {manageTab === tab.id && <div className="absolute -left-1 w-1 h-6 bg-white rounded-full"></div>}
+                                </button>
+                            ))}
+                            <div className="mt-auto p-4 bg-blue-600/5 rounded-[2rem] border border-blue-600/10">
+                                <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-relaxed text-center">System integrity optimized. All changes are indexed.</p>
+                            </div>
+                        </div>
+
+                        {/* RIGHT CONTENT AREA */}
+                        <div className="flex-1 flex flex-col bg-white dark:bg-transparent overflow-hidden">
+                            {/* DYNAMIC HEADER & SEARCH */}
+                            <div className="p-8 border-b dark:border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 shrink-0">
+                                <div className="space-y-1">
+                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">{tabs.find(t => t.id === manageTab).label}</h3>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Management & Configuration</p>
+                                </div>
+                                <div className="relative w-full md:w-72">
+                                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Filter results..." 
+                                        value={manageSearch}
+                                        onChange={(e) => setManageSearch(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none dark:text-white shadow-inner"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* LIST AREA */}
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-3">
+                                {manageTab === 'audit' && (
+                                    <div className="space-y-3">
+                                        {activityLogs.filter(log => log.description.toLowerCase().includes(manageSearch.toLowerCase())).length === 0 && (
+                                            <div className="text-center py-20 text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">No activity found in filter.</div>
+                                        )}
+                                        {activityLogs.filter(log => log.description.toLowerCase().includes(manageSearch.toLowerCase())).map(log => {
+                                            const date = log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString('default', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now';
+                                            const isExpanded = expandedLogs[log.id];
+                                            const actionColors = {
+                                                'ADD': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+                                                'EDIT': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                                                'DELETE': 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                            };
+                                            return (
+                                                <div key={log.id} className="bg-gray-50 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl overflow-hidden transition-all shadow-sm">
+                                                    <div onClick={() => setExpandedLogs(prev => ({ ...prev, [log.id]: !isExpanded }))} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors gap-4">
+                                                        <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                                                            <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black border uppercase tracking-widest shrink-0 ${actionColors[log.action] || actionColors['EDIT']}`}>{log.action}</span>
+                                                            <span className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-tight truncate">{log.description}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-4 shrink-0">
+                                                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">{date}</span>
+                                                            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}><ChevronDown size={14} className="text-gray-400" /></div>
+                                                        </div>
+                                                    </div>
+                                                    {isExpanded && (
+                                                        <div className="px-4 pb-4 space-y-4 animate-slide-down border-t dark:border-white/5 pt-4">
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {(log.changes?.after || log.changes?.before) && (() => {
+                                                                    const ctx = log.changes?.after || log.changes?.before;
+                                                                    return (
+                                                                        <>
+                                                                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/5 border border-transparent dark:border-white/5 text-[8px] font-black text-gray-500 uppercase tracking-widest"><Calendar size={10} /> {ctx.date}</div>
+                                                                            {ctx.source && <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50/50 dark:bg-blue-500/5 border border-transparent dark:border-blue-500/10 text-[8px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest"><CreditCard size={10} /> {ctx.source}</div>}
+                                                                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50/50 dark:bg-purple-500/5 border border-transparent dark:border-purple-500/10 text-[8px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest"><Tag size={10} /> {ctx.category}</div>
+                                                                        </>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                            {log.action === 'EDIT' && log.changes?.before && log.changes?.after && (
+                                                                <div className="space-y-2 mt-1">
+                                                                    {Object.keys(log.changes.after).map(key => {
+                                                                        const before = log.changes.before[key];
+                                                                        const after = log.changes.after[key];
+                                                                        const isChanged = Array.isArray(after) ? JSON.stringify(after) !== JSON.stringify(before) : after !== before;
+                                                                        if (!isChanged || key === 'id') return null;
+                                                                        const displayValue = (val) => Array.isArray(val) ? (val.length > 0 ? val.join(', ') : 'None') : (typeof val === 'number' ? `$${val.toFixed(0)}` : (val || 'None'));
+                                                                        return (
+                                                                            <div key={key} className="flex items-center justify-between">
+                                                                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest w-20">{key}</span>
+                                                                                <div className="flex-1 flex items-center gap-2 overflow-hidden justify-end">
+                                                                                    <span className="text-[9px] font-bold text-gray-400 line-through truncate max-w-[100px]">{displayValue(before)}</span>
+                                                                                    <ArrowRight size={8} className="text-gray-400 shrink-0" /><span className="text-[9px] font-black text-blue-500 truncate max-w-[100px]">{displayValue(after)}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            {log.action === 'ADD' && log.changes?.after?.amount && <div className="flex justify-end pt-2 border-t dark:border-white/5"><span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Entry Magnified: +${Number(log.changes.after.amount).toLocaleString()}</span></div>}
+                                                            {log.action === 'DELETE' && log.changes?.before?.amount && <div className="flex justify-end pt-2 border-t dark:border-white/5"><span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Entry Purged: -${Number(log.changes.before.amount).toLocaleString()}</span></div>}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                        <input 
-                                            className="flex-1 bg-white dark:bg-gray-800 px-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none border border-blue-200 dark:border-blue-800 dark:text-white" 
-                                            value={editingItem.current} 
-                                            onChange={e => setEditingItem(prev => ({ ...prev, current: e.target.value }))}
-                                        />
-                                        <button onClick={handleRename} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-xl transition-all hover:scale-105"><Check size={18}/></button>
-                                        <button onClick={() => setEditingItem(null)} className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-xl hover:bg-gray-200 transition-all"><X size={18}/></button>
+                                            );
+                                        })}
                                     </div>
-                                );
-                            }
-                            return (
-                                <div key={cat} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-white/[0.02] rounded-2xl hover:bg-gray-100 dark:hover:bg-white/[0.05] cursor-pointer transition-all border border-transparent hover:border-gray-100 dark:hover:border-white/5" 
-                                     onClick={() => {
-                                         const newExcluded = excludedCategories.includes(cat) ? excludedCategories.filter(c => c !== cat) : [...excludedCategories, cat];
-                                         setExcludedCategories(newExcluded);
-                                     }}>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-white/5 flex items-center justify-center text-gray-500 dark:text-gray-400 shadow-sm border border-gray-100 dark:border-white/10">
-                                            {getCategoryIcon(cat, 20, categoryIcons)}
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">{cat}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {excludedCategories.includes(cat) ? <CheckSquare size={22} className="text-rose-500"/> : <Square size={22} className="text-gray-300 dark:text-gray-600"/>}
-                                        <button onClick={(e) => { e.stopPropagation(); setEditingItem({ type: 'category', original: cat, current: cat }); }} className="p-2.5 hover:bg-blue-100 dark:hover:bg-blue-600/20 rounded-xl text-gray-400 hover:text-blue-600 transition-all"><Edit2 size={16}/></button>
-                                        <button onClick={(e) => { e.stopPropagation(); setManagerConfirm({ type: 'category', value: cat }) }} className="p-2.5 hover:bg-red-100 dark:hover:bg-red-600/20 rounded-xl text-gray-400 hover:text-red-500 transition-all"><Trash2 size={16}/></button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        
-                        {manageTab === 'source' && allSources.map(src => {
-                            const isEditing = editingItem && editingItem.type === 'source' && editingItem.original === src;
-                            if (isEditing) {
-                                return (
-                                    <div key={src} className="flex gap-3 bg-blue-50 dark:bg-blue-600/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-600/30">
-                                        <input 
-                                            className="flex-1 bg-white dark:bg-gray-800 px-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none border border-blue-200 dark:border-blue-800 dark:text-white" 
-                                            value={editingItem.current} 
-                                            onChange={e => setEditingItem(prev => ({ ...prev, current: e.target.value }))}
-                                        />
-                                        <button onClick={handleRename} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-xl transition-all hover:scale-105"><Check size={18}/></button>
-                                        <button onClick={() => setEditingItem(null)} className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-xl hover:bg-gray-200 transition-all"><X size={18}/></button>
-                                    </div>
-                                );
-                            }
-                            return (
-                                <div key={src} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-white/[0.02] rounded-2xl transition-all hover:bg-gray-100 dark:hover:bg-white/[0.05] border border-transparent hover:border-gray-100 dark:hover:border-white/5">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-gray-500 shadow-sm border border-gray-100 dark:border-white/10">
-                                            <CreditCard size={20} />
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">{src}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => setEditingItem({ type: 'source', original: src, current: src })} className="p-2.5 hover:bg-blue-100 dark:hover:bg-blue-600/20 rounded-xl text-gray-400 hover:text-blue-600 transition-all"><Edit2 size={16}/></button>
-                                        <button onClick={() => setManagerConfirm({ type: 'source', value: src })} className="p-2.5 hover:bg-red-100 dark:hover:bg-red-600/20 rounded-xl text-gray-400 hover:text-red-500 transition-all"><Trash2 size={16}/></button>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                )}
 
-                        {manageTab === 'tags' && (
-                             <div className="flex flex-wrap gap-3">
-                                {allTags.map(tag => {
-                                    const isEditing = editingItem && editingItem.type === 'tags' && editingItem.original === tag;
+                                {manageTab === 'category' && allCategories.filter(c => c.toLowerCase().includes(manageSearch.toLowerCase())).map(cat => {
+                                    const isEditing = editingItem && editingItem.type === 'category' && editingItem.original === cat;
                                     if (isEditing) {
                                         return (
-                                            <div key={tag} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-600/10 p-2 rounded-xl border border-blue-100 dark:border-blue-600/30">
-                                                <input 
-                                                    className="w-32 bg-white dark:bg-gray-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg border border-blue-200 dark:border-blue-800 outline-none dark:text-white" 
-                                                    value={editingItem.current} 
-                                                    onChange={e => setEditingItem(prev => ({ ...prev, current: e.target.value }))}
-                                                />
-                                                <button onClick={handleRename} className="text-blue-600 hover:scale-110 transition-all"><Check size={16}/></button>
-                                                <button onClick={() => setEditingItem(null)} className="text-gray-400 hover:scale-110 transition-all"><X size={16}/></button>
+                                            <div key={cat} className="flex gap-3 bg-blue-50 dark:bg-blue-600/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-600/30">
+                                                <div className="relative group">
+                                                    <button onClick={() => setIconPickerOpen(iconPickerOpen === cat ? null : cat)} className="w-12 h-12 bg-white dark:bg-gray-800 rounded-xl flex items-center justify-center border border-blue-100 dark:border-blue-800 text-blue-600 shadow-xl">{getCategoryIcon(editingItem.icon || cat, 20, categoryIcons)}</button>
+                                                    {iconPickerOpen === cat && (
+                                                        <div className="absolute top-full left-0 mt-3 bg-white dark:bg-[#0a0a0a] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/10 rounded-2xl w-72 p-4 grid grid-cols-6 gap-2 z-[9999] h-56 overflow-y-auto custom-scrollbar">
+                                                            {AVAILABLE_ICONS.map(iconKey => {
+                                                                const IconCmp = ICON_MAP[iconKey];
+                                                                return (
+                                                                    <button key={iconKey} onClick={() => { setEditingItem(prev => ({ ...prev, icon: iconKey })); setIconPickerOpen(null); }} className="p-2.5 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl flex justify-center transition-all hover:scale-110"><IconCmp size={18} className="text-gray-600 dark:text-gray-400 hover:text-blue-600" /></button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <input className="flex-1 bg-white dark:bg-gray-800 px-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none border border-blue-200 dark:border-blue-800 dark:text-white" value={editingItem.current} onChange={e => setEditingItem(prev => ({ ...prev, current: e.target.value }))}/>
+                                                <button onClick={handleRename} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-xl transition-all hover:scale-105"><Check size={18}/></button>
+                                                <button onClick={() => setEditingItem(null)} className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-xl hover:bg-gray-200 transition-all"><X size={18}/></button>
                                             </div>
                                         );
                                     }
                                     return (
-                                        <div key={tag} className="flex items-center gap-3 bg-purple-50 dark:bg-white/5 text-purple-700 dark:text-purple-400 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:shadow-xl hover:bg-purple-100 dark:hover:bg-white/10 transition-all shadow-sm border border-transparent hover:border-purple-200 dark:hover:border-purple-500/30" onClick={() => setEditingItem({ type: 'tags', original: tag, current: tag })}>
-                                            <Hash size={12} className="opacity-50" />
-                                            #{tag}
-                                            <button onClick={(e) => { e.stopPropagation(); setManagerConfirm({ type: 'tags', value: tag }); }} className="hover:text-red-600 transition-all ml-1"><X size={14}/></button>
+                                        <div key={cat} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-white/[0.02] rounded-2xl hover:bg-gray-100 dark:hover:bg-white/[0.05] cursor-pointer transition-all border border-transparent hover:border-gray-100 dark:hover:border-white/5 shrink-0" onClick={() => setExcludedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}>
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-xl bg-white dark:bg-white/5 flex items-center justify-center text-gray-500 dark:text-gray-400 shadow-sm border border-gray-100 dark:border-white/10">{getCategoryIcon(cat, 20, categoryIcons)}</div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">{cat}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {excludedCategories.includes(cat) ? <CheckSquare size={22} className="text-rose-500"/> : <Square size={22} className="text-gray-300 dark:text-gray-600"/>}
+                                                <button onClick={(e) => { e.stopPropagation(); setEditingItem({ type: 'category', original: cat, current: cat }); }} className="p-2.5 hover:bg-blue-100 dark:hover:bg-blue-600/20 rounded-xl text-gray-400 hover:text-blue-600 transition-all"><Edit2 size={16}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); setManagerConfirm({ type: 'category', value: cat }) }} className="p-2.5 hover:bg-red-100 dark:hover:bg-red-600/20 rounded-xl text-gray-400 hover:text-red-500 transition-all"><Trash2 size={16}/></button>
+                                            </div>
                                         </div>
                                     );
                                 })}
+
+                                {manageTab === 'source' && allSources.filter(s => s.toLowerCase().includes(manageSearch.toLowerCase())).map(src => {
+                                    const isEditing = editingItem && editingItem.type === 'source' && editingItem.original === src;
+                                    if (isEditing) {
+                                        return (
+                                            <div key={src} className="flex gap-3 bg-blue-50 dark:bg-blue-600/10 p-3 rounded-2xl border border-blue-100 dark:border-blue-600/30">
+                                                <input className="flex-1 bg-white dark:bg-gray-800 px-4 rounded-xl text-xs font-black uppercase tracking-widest outline-none border border-blue-200 dark:border-blue-800 dark:text-white" value={editingItem.current} onChange={e => setEditingItem(prev => ({ ...prev, current: e.target.value }))}/>
+                                                <button onClick={handleRename} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-xl transition-all hover:scale-105"><Check size={18}/></button>
+                                                <button onClick={() => setEditingItem(null)} className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-xl hover:bg-gray-200 transition-all"><X size={18}/></button>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div key={src} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-white/[0.02] rounded-2xl transition-all hover:bg-gray-100 dark:hover:bg-white/[0.05] border border-transparent hover:border-gray-100 dark:hover:border-white/5">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-xl bg-white dark:bg-white/5 flex items-center justify-center text-gray-400 dark:text-gray-500 shadow-sm border border-gray-100 dark:border-white/10"><CreditCard size={20} /></div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-200">{src}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => setEditingItem({ type: 'source', original: src, current: src })} className="p-2.5 hover:bg-blue-100 dark:hover:bg-blue-600/20 rounded-xl text-gray-400 hover:text-blue-600 transition-all"><Edit2 size={16}/></button>
+                                                <button onClick={() => setManagerConfirm({ type: 'source', value: src })} className="p-2.5 hover:bg-red-100 dark:hover:bg-red-600/20 rounded-xl text-gray-400 hover:text-red-500 transition-all"><Trash2 size={16}/></button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+
+                                {manageTab === 'tags' && (
+                                     <div className="flex flex-wrap gap-3">
+                                        {allTags.filter(t => t.toLowerCase().includes(manageSearch.toLowerCase())).map(tag => {
+                                            const isEditing = editingItem && editingItem.type === 'tags' && editingItem.original === tag;
+                                            if (isEditing) {
+                                                return (
+                                                    <div key={tag} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-600/10 p-2 rounded-xl border border-blue-100 dark:border-blue-600/30">
+                                                        <input className="w-32 bg-white dark:bg-gray-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg border border-blue-200 dark:border-blue-800 outline-none dark:text-white" value={editingItem.current} onChange={e => setEditingItem(prev => ({ ...prev, current: e.target.value }))}/>
+                                                        <button onClick={handleRename} className="text-blue-600 hover:scale-110 transition-all"><Check size={16}/></button>
+                                                        <button onClick={() => setEditingItem(null)} className="text-gray-400 hover:scale-110 transition-all"><X size={16}/></button>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div key={tag} className="flex items-center gap-3 bg-purple-50 dark:bg-white/5 text-purple-700 dark:text-purple-400 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer hover:shadow-xl hover:bg-purple-100 dark:hover:bg-white/10 transition-all shadow-sm border border-transparent hover:border-purple-200 dark:hover:border-purple-500/30" onClick={() => setEditingItem({ type: 'tags', original: tag, current: tag })}>
+                                                    <Hash size={12} className="opacity-50" />
+                                                    #{tag}
+                                                    <button onClick={(e) => { e.stopPropagation(); setManagerConfirm({ type: 'tags', value: tag }); }} className="hover:text-rose-600 transition-all ml-1"><X size={14}/></button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
-                        )}
+
+                            {/* FOOTER ACTION (ADD NEW) */}
+                            {manageTab !== 'audit' && !editingItem && (
+                                <div className="p-8 border-t dark:border-white/5 bg-gray-50/30 dark:bg-white/[0.01] shrink-0">
+                                    <div className="flex gap-3">
+                                        <input id="newItemInput" placeholder={`Initialize new ${manageTab}...`} className="flex-1 bg-white dark:bg-[#0a0a0a] px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none border border-transparent focus:border-blue-500/30 transition-all dark:text-white shadow-sm"/>
+                                        <button onClick={() => {
+                                            const val = document.getElementById('newItemInput').value;
+                                            if(val) alert(`Protocol: To add "${val}", simply assign it to a new entry. It will be indexed automatically.`);
+                                        }} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-blue-600/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2"><Plus size={16}/> Add New</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </Popup>
-        )}
+                </Popup>
+            );
+        })()}
 
         {/* Manager Confirm Dialog */}
         {managerConfirm && (
@@ -2492,29 +2658,46 @@ const TransactionRow = ({ tx, onClick, onFilterClick, isGlobalExcluded, category
     );
 };
 
-const Popup = ({ title, onClose, children, wide, headerAction, zIndex, centered }) => (
-    <div 
-        className={`fixed inset-0 bg-gray-900/40 dark:bg-[#000000]/60 backdrop-blur-xl flex items-end md:items-center justify-center p-4 md:p-8 animate-fade-in ${centered ? '' : 'md:pl-[340px]'}`} 
-        style={{ zIndex: zIndex || 10000 }}
-        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-        <div className={`bg-white dark:bg-[#0a0a0a] w-full ${wide ? 'max-w-[1400px]' : 'max-w-xl'} rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col max-h-[90vh] border border-gray-100 dark:border-white/10 overflow-hidden animate-in zoom-in slide-in-from-bottom-4 duration-300`} onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-10 py-8 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
-                <div className="flex items-center gap-4 overflow-hidden">
-                    {headerAction}
-                    <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase truncate">{title}</div>
+const Popup = ({ title, onClose, children, wide, size = 'md', headerAction, zIndex, centered, fullHeight = false }) => {
+    const sizeClasses = {
+        'sm': 'max-w-md',
+        'md': 'max-w-xl',
+        'lg': 'max-w-4xl',
+        'xl': 'max-w-5xl',
+        'wide': 'max-w-[1400px]'
+    };
+    const maxWidth = wide ? sizeClasses['wide'] : sizeClasses[size];
+
+    return (
+        <div
+            className={`fixed inset-0 bg-gray-900/40 dark:bg-[#000000]/60 backdrop-blur-xl flex items-end md:items-center justify-center p-4 md:p-8 animate-fade-in ${centered ? '' : 'md:pl-[340px]'}`} 
+            style={{ zIndex: zIndex || 10000 }}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+        >
+            <div className={`bg-white dark:bg-[#0a0a0a] w-full ${maxWidth} rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex flex-col max-h-[90vh] border border-gray-100 dark:border-white/10 overflow-hidden animate-in zoom-in slide-in-from-bottom-4 duration-300`} onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center px-10 py-8 border-b border-gray-50 dark:border-white/5 bg-gray-50/50 dark:bg-white/[0.02]">
+                    <div className="flex items-center gap-4 overflow-hidden">
+                        {headerAction}
+                        <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase truncate">{title}</div>
+                    </div>
+                    <button onClick={onClose} className="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-2xl hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center shadow-inner group">
+                        <X size={24} className="group-hover:rotate-90 transition-transform duration-300"/>   
+                    </button>
                 </div>
-                <button onClick={onClose} className="w-12 h-12 bg-gray-100 dark:bg-white/5 rounded-2xl hover:bg-gray-200 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-all flex items-center justify-center shadow-inner group">
-                    <X size={24} className="group-hover:rotate-90 transition-transform duration-300"/>
-                </button>
-            </div>
-            <div className="p-10 text-gray-700 dark:text-gray-200 overflow-y-auto custom-scrollbar">
-                {children}
+                
+                {fullHeight ? (
+                    <div className="flex-1 overflow-hidden flex flex-col">
+                        {children}
+                    </div>
+                ) : (
+                    <div className="p-10 text-gray-700 dark:text-gray-200 overflow-y-auto custom-scrollbar">     
+                        {children}
+                    </div>
+                )}
             </div>
         </div>
-    </div>
-);
-
+    );
+};
 const CreatableCategorySelect = ({ value, onChange, options, placeholder }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [localValue, setLocalValue] = useState(null);
