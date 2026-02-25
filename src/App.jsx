@@ -10,7 +10,7 @@ import {
   Plane, Gift, Music, Book, Wrench, Heart, Smile, Star, Sun, Moon, Cloud, Umbrella, Droplet, Anchor, Map, Lock, Key, Flag, Bell, Smartphone, Wifi, Coffee, ShoppingCart, Check,
   ArrowRight, Shield, Globe, Cpu, Sparkles, Monitor, Layers, MousePointer2, Database
 } from 'lucide-react';
-import { ComposedChart, Line, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Legend } from 'recharts';
+import { ComposedChart, Line, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Legend, AreaChart, Area, BarChart } from 'recharts';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
 
@@ -21,13 +21,14 @@ const CATEGORY_RULES = {
   'Shopping': ['amazon', 'walmart', 'target', 'bestbuy', 'apple', 'nike', 'clothing', 'store', 'shop', 'saks', 'lululemon'],
   'Utilities': ['att', 'verizon', 't-mobile', 'comcast', 'water', 'electric', 'power', 'internet', 'subscription', 'netflix', 'spotify', 'hulu', 'peacock'],
   'Housing': ['rent', 'mortgage', 'hotel', 'airbnb', 'lodging', 'residence inn'],
-  'Income': ['payroll', 'deposit', 'salary', 'transfer', 'refund', 'credit'],
+  'Income': ['payroll', 'deposit', 'salary', 'transfer', 'refund', 'credit', 'enovation'],
   'Health': ['doctor', 'pharmacy', 'cvs', 'walgreens', 'hospital', 'dental', 'fitness', 'gym'],
   'CC Payment': ['payment to', 'autopay', 'thank you', 'payment received', 'internet payment'],
   'Grocery': ['liquor', 'wholefds', 'woodmans', 'patel brothers', 'hareli', 'desi chowrastha', 'kroger', 'sprouts'],
   'Entertainment': ['cinemark', 'amc'],
-  'Interest': ['interest paid', 'interest credit'],
-  'SENDTOMOUNI': ['mobile transfer to chk']
+  'Interest': ['interest paid', 'interest credit', 'dividend'],
+  'SENDTOMOUNI': ['mobile transfer to chk', 'payment to mounisha gona'],
+  'Car Payment': ['vhagar']
 };
 
 const detectCategory = (desc) => {
@@ -39,7 +40,7 @@ const detectCategory = (desc) => {
   return null;
 };
 
-const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Utilities', 'Housing', 'Health', 'Entertainment', 'CC Payment', 'Interest', 'India Transfer', 'Uncategorized'];
+const DEFAULT_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Utilities', 'Housing', 'Health', 'Entertainment', 'CC Payment', 'Interest', 'India Transfer', 'SENDTOMOUNI', 'Car Payment', 'Uncategorized'];
 
 // --- ICON MAP ---
 const ICON_MAP = {
@@ -67,6 +68,13 @@ const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
 };
 
+const formatINR = (amount) => {
+    if (!amount) return '₹0';
+    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)} L`;
+    return `₹${amount.toLocaleString('en-IN')}`;
+};
+
 // --- ICON HELPER ---
 const getCategoryIcon = (cat, size = 18, userIcons = {}) => {
     // 1. Check Custom User Icon
@@ -84,11 +92,15 @@ const getCategoryIcon = (cat, size = 18, userIcons = {}) => {
     if (lower.includes('hous') || lower.includes('rent') || lower.includes('hotel')) return <Home size={size} />;
     if (lower.includes('health') || lower.includes('doctor') || lower.includes('gym')) return <Activity size={size} />;
     if (lower.includes('entertain') || lower.includes('movie') || lower.includes('film')) return <Film size={size} />;
-    if (lower.includes('income') || lower.includes('salary') || lower.includes('payroll')) return <Briefcase size={size} />;
+    if (lower.includes('income') || lower.includes('salary') || lower.includes('payroll') || lower.includes('enovation')) return <Briefcase size={size} />;
     if (lower.includes('education') || lower.includes('school')) return <GraduationCap size={size} />;
-    if (lower.includes('cc payment') || lower.includes('transfer')) return <CreditCard size={size} />;
+    if (lower.includes('cc payment') || lower.includes('transfer') || lower.includes('sendtomouni')) return <CreditCard size={size} />;
+    if (lower.includes('car payment')) return <Car size={size} />;
     return <Tag size={size} />;
 };
+
+// --- CONSTANTS ---
+const MONTH_ORDER = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function App() {
   const [user, setUser] = useState(null);
@@ -120,8 +132,8 @@ function App() {
   const [excludedCategories, setExcludedCategories] = useState(() => {
       try {
           const saved = localStorage.getItem('excludedCategories');
-          return saved ? JSON.parse(saved) : ['CC Payment', 'Transfer'];
-      } catch { return ['CC Payment', 'Transfer']; }
+          return saved ? JSON.parse(saved) : ['CC Payment', 'Transfer', 'SENDTOMOUNI'];
+      } catch { return ['CC Payment', 'Transfer', 'SENDTOMOUNI']; }
   });
 
   const [categoryIcons, setCategoryIcons] = useState(() => {
@@ -150,12 +162,24 @@ function App() {
   const [importPreview, setImportPreview] = useState(null); 
   const [importError, setImportError] = useState(null);
   const [importGlobalSource, setImportGlobalSource] = useState(''); 
+  const [importToIndiaHub, setImportToIndiaHub] = useState(false);
+  
+  // India Hub State
+  const [indiaViewMode, setIndiaViewMode] = useState('year'); 
+  const [indiaGraphGranularity, setIndiaGraphGranularity] = useState('monthly'); 
+  const [indiaGraphRange, setIndiaGraphRange] = useState('6M'); 
+  const [indiaSelectedYears, setIndiaSelectedYears] = useState(['All Years']);
+  const [indiaViewMonth, setIndiaViewMonth] = useState(today.getMonth());
+  const [indiaViewRecipient, setIndiaViewRecipient] = useState('All Recipients');
+  
+  const [showIndiaAuditModal, setShowIndiaAuditModal] = useState(false);
   const [showImportConfirmModal, setShowImportConfirmModal] = useState(false); 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [expandedYears, setExpandedYears] = useState({ [today.getFullYear()]: true });
   const [expandedMonths, setExpandedMonths] = useState({});
   const [historySearch, setHistorySearch] = useState('');
+  const [selectedTxIds, setSelectedTxIds] = useState([]);
   const [darkMode, setDarkMode] = useState(() => {
       try {
           const saved = localStorage.getItem('darkMode');
@@ -224,8 +248,12 @@ function App() {
 
   const handleLogin = async () => { try { await signInWithPopup(auth, provider); } catch (e) { console.error(e); } };
 
+  const toggleSelectTx = (id) => {
+      setSelectedTxIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
   // --- LOGGING ---
-  const logActivity = async (action, txId, description, changes = {}) => {
+  const logActivity = async (action, txId, description, changes = {}, isIndiaCorridor = false) => {
     if (!user) return;
     try {
         await addDoc(collection(db, "users", user.uid, "activity_logs"), {
@@ -234,6 +262,7 @@ function App() {
             description,
             changes,
             timestamp: serverTimestamp(),
+            isIndiaCorridor,
             metadata: {
                 userAgent: navigator.userAgent,
                 platform: navigator.platform
@@ -254,7 +283,8 @@ function App() {
       notes: formData.notes || '',
       type: formData.type, mode: formData.mode, category: finalCat,
       source: formData.source || '', tags: finalTags, 
-      isExcluded: formData.isExcluded 
+      isExcluded: formData.isExcluded,
+      isIndiaCorridor: formData.isIndiaCorridor || false
     };
     try {
       if (formData.id) {
@@ -263,10 +293,10 @@ function App() {
           const oldData = oldSnap.exists() ? oldSnap.data() : {};
           
           await updateDoc(doc(db, "users", user.uid, "transactions", formData.id), txData);
-          logActivity('EDIT', formData.id, txData.description, { before: oldData, after: txData });
+          logActivity('EDIT', formData.id, txData.description, { before: oldData, after: txData }, txData.isIndiaCorridor);
       } else {
           const docRef = await addDoc(collection(db, "users", user.uid, "transactions"), { ...txData, id: Date.now() });
-          logActivity('ADD', docRef.id, txData.description, { after: txData });
+          logActivity('ADD', docRef.id, txData.description, { after: txData }, txData.isIndiaCorridor);
       }
       setEditTx(null);
       if (!formData.id) setActiveTab('dashboard'); 
@@ -278,34 +308,71 @@ function App() {
     setLoading(true);
     try {
         if (deleteConfirm.type === 'single') {
+            if (!deleteConfirm.id) throw new Error("Transaction ID missing.");
             const oldSnap = await getDoc(doc(db, "users", user.uid, "transactions", deleteConfirm.id));
             const oldData = oldSnap.exists() ? oldSnap.data() : {};
             
             await deleteDoc(doc(db, "users", user.uid, "transactions", deleteConfirm.id));
-            logActivity('DELETE', deleteConfirm.id, oldData.description || 'Unknown', { before: oldData });
-        } else if (deleteConfirm.type === 'group') {
-            for (const tx of deleteConfirm.group) {
-                await deleteDoc(doc(db, "users", user.uid, "transactions", tx.firestoreId));
-                logActivity('DELETE', tx.firestoreId, tx.description, { before: tx });
+            logActivity('DELETE', deleteConfirm.id, oldData.description || 'Unknown', { before: oldData }, oldData.isIndiaCorridor);
+        } else {
+            const deletedItems = [];
+            let isIndiaBatch = false;
+
+            if (deleteConfirm.type === 'group') {
+                const batch = writeBatch(db);
+                let count = 0;
+                for (const tx of deleteConfirm.group) {
+                    let docId = tx.firestoreId;
+                    
+                    // Fallback for older logs: find docId by matching the internal 'id'
+                    if (!docId && tx.id) {
+                        const match = transactions.find(t => t.id === tx.id);
+                        if (match) docId = match.firestoreId;
+                    }
+
+                    if (!docId) continue;
+                    
+                    deletedItems.push(tx);
+                    if (tx.isIndiaCorridor) isIndiaBatch = true;
+                    
+                    const docRef = doc(collection(db, "users", user.uid, "transactions"), String(docId));
+                    batch.delete(docRef);
+                    count++;
+                }
+                if (count > 0) await batch.commit();
+            } else if (deleteConfirm.type === 'range') {
+                const q = query(
+                    collection(db, "users", user.uid, "transactions"), 
+                    where("date", ">=", deleteConfirm.startDate), 
+                    where("date", "<=", deleteConfirm.endDate)
+                );
+                const snapshot = await getDocs(q);
+                const batch = writeBatch(db);
+                snapshot.docs.forEach(docSnap => {
+                    const data = docSnap.data();
+                    deletedItems.push({ ...data, firestoreId: docSnap.id });
+                    if (data.isIndiaCorridor) isIndiaBatch = true;
+                    batch.delete(docSnap.ref);
+                });
+                await batch.commit();
             }
-        } else if (deleteConfirm.type === 'range') {
-            const q = query(
-                collection(db, "users", user.uid, "transactions"), 
-                where("date", ">=", deleteConfirm.startDate), 
-                where("date", "<=", deleteConfirm.endDate)
-            );
-            const snapshot = await getDocs(q);
-            const batch = writeBatch(db);
-            snapshot.docs.forEach(docSnap => {
-                const data = docSnap.data();
-                logActivity('DELETE', docSnap.id, data.description, { before: data });
-                batch.delete(docSnap.ref);
-            });
-            await batch.commit();
+
+            if (deletedItems.length > 0) {
+                logActivity('BULK_DELETE', 'BATCH', `Bulk Purge: ${deletedItems.length} records removed (${deleteConfirm.label})`, { 
+                    items: deletedItems,
+                    count: deletedItems.length,
+                    type: deleteConfirm.type,
+                    label: deleteConfirm.label
+                }, isIndiaBatch);
+            }
         }
+        setSelectedTxIds([]);
         setEditTx(null);
         setDeleteConfirm(null);
-    } catch(e) { alert("Delete failed: " + e.message); }
+    } catch(e) { 
+        console.error("Delete Error:", e);
+        alert("Delete failed: " + e.message); 
+    }
     setLoading(false);
   };
 
@@ -321,16 +388,33 @@ function App() {
               q = query(collection(db, "users", user.uid, "transactions"), where(type, "==", value));
           }
           const snapshot = await getDocs(q);
+          const processedItems = [];
+
           snapshot.docs.forEach(docSnap => {
               const ref = doc(db, "users", user.uid, "transactions", docSnap.id);
+              const data = docSnap.data();
+              processedItems.push({ ...data, firestoreId: docSnap.id });
+
               if (type === 'category') batch.update(ref, { category: 'Uncategorized' });
               else if (type === 'source') batch.update(ref, { source: '' });
               else if (type === 'tags') {
-                  const newTags = docSnap.data().tags.filter(t => t !== value);
+                  const newTags = data.tags.filter(t => t !== value);
                   batch.update(ref, { tags: newTags });
               }
           });
+          
           await batch.commit();
+
+          if (processedItems.length > 0) {
+              const isIndiaBatch = type === 'category' && value === 'India Transfer';
+              logActivity('BULK_EDIT', 'BATCH', `Refactor Protocol: ${processedItems.length} records modified via ${type} de-indexing (${value})`, {
+                  items: processedItems,
+                  count: processedItems.length,
+                  editType: type,
+                  originalValue: value
+              }, isIndiaBatch);
+          }
+
           if (type === 'category' && excludedCategories.includes(value)) {
               setExcludedCategories(prev => prev.filter(c => c !== value));
           }
@@ -409,21 +493,31 @@ function App() {
   const processFile = async (file) => {
     if(!file) return;
     setLoading(true);
+    setImportError(null);
     const ext = file.name.split('.').pop().toLowerCase();
+    const input = document.getElementById('global-file-input');
+    
     try {
       let parsedData = [];
       if (ext === 'pdf') parsedData = await processPDF(file);
       else if (['xlsx', 'xls', 'csv'].includes(ext)) parsedData = await processExcel(file);
       else if (ext === 'txt') parsedData = await processText(file);
       
-      if (parsedData.length > 0) {
+      if (parsedData && parsedData.length > 0) {
           setImportPreview(parsedData);
           setImportGlobalSource(''); 
       } else {
-          setImportError("No transactions detected. Please verify the statement format.");
+          setImportError("No transactions detected. Please verify the file format and ensure headers like 'USD', 'INR', or 'Date' are present.");
+          setImportToIndiaHub(false);
       }
-    } catch (err) { setImportError("Processing Error: " + err.message); }
-    setLoading(false);
+    } catch (err) { 
+        console.error("Import Error:", err);
+        setImportError("Processing Error: " + err.message); 
+        setImportToIndiaHub(false);
+    } finally {
+        setLoading(false);
+        if (input) input.value = ''; // CRITICAL: Allow re-selection of same file
+    }
   };
 
   const processPDF = async (file) => {
@@ -454,8 +548,100 @@ function App() {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const sheet = XLSX.read(new Uint8Array(e.target.result), { type: 'array' }).Sheets[XLSX.read(new Uint8Array(e.target.result), { type: 'array' }).SheetNames[0]];
-        resolve(parseRawText(XLSX.utils.sheet_to_csv(sheet)));
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        if (importToIndiaHub) {
+            let allParsed = [];
+            let debugInfo = [];
+            
+            workbook.SheetNames.forEach(name => {
+                const sheet = workbook.Sheets[name];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                if (rows.length < 1) return;
+
+                // 1. Aggressive Header Search
+                const keywords = ['date', 'who', 'send', 'dollar', 'usd', 'rate', 'rupee', 'inr', 'received', 'recieved', 'visible', 'hidden'];
+                let headerRowIndex = -1;
+                let foundHeader = [];
+                
+                for (let i = 0; i < Math.min(rows.length, 50); i++) {
+                    const rowCells = rows[i];
+                    if (!Array.isArray(rowCells)) continue;
+                    const rowText = rowCells.map(c => String(c || '').toLowerCase()).join(' ');
+                    const matches = keywords.filter(k => rowText.includes(k));
+                    if (matches.length >= 2) {
+                        headerRowIndex = i;
+                        foundHeader = rowCells.map(h => String(h || '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+                        break;
+                    }
+                }
+
+                if (headerRowIndex === -1) {
+                    debugInfo.push(`Sheet "${name}": No header found in first 50 rows.`);
+                    return;
+                }
+
+                const dataRows = rows.slice(headerRowIndex + 1);
+                const sheetParsed = dataRows.map((row, rIdx) => {
+                    if (!Array.isArray(row) || row.length === 0) return null;
+                    
+                    const findVal = (keys) => {
+                        const idx = foundHeader.findIndex(h => keys.some(k => h.includes(k)));
+                        return idx !== -1 ? row[idx] : null;
+                    };
+
+                    // Map specific columns from screenshot
+                    let dateVal = findVal(['date', 'day', 'time']);
+                    if (typeof dateVal === 'number' && dateVal > 10000) {
+                        const d = XLSX.utils.format_cell({ t: 'd', v: dateVal });
+                        dateVal = new Date(d).toISOString().split('T')[0];
+                    } else if (dateVal) {
+                        const d = new Date(dateVal);
+                        if (!isNaN(d.getTime())) dateVal = d.toISOString().split('T')[0];
+                    }
+                    
+                    const usd = parseFloat(String(findVal(['dollar', 'usd', 'sent']) || '0').replace(/[$,\s]/g, ''));
+                    const rate = parseFloat(String(findVal(['rate', 'conversion', 'fx']) || '0').replace(/[₹,\s]/g, ''));
+                    const inr = parseFloat(String(findVal(['rupee', 'inr', 'received', 'recieved']) || '0').replace(/[₹,\s]/g, ''));
+                    const recipient = findVal(['who', 'recipient', 'sendto', 'name', 'payee']) || '';
+                    const status = String(findVal(['visible', 'hidden', 'status']) || '').toLowerCase();
+                    const notes = String(findVal(['description', 'notes', 'memo', 'purpose', 'remarks']) || '');
+
+                    // Only return rows that look like actual transfers
+                    if (!usd && !inr) return null;
+
+                    return {
+                        tempId: Date.now() + Math.random() + rIdx,
+                        date: dateVal || new Date().toISOString().split('T')[0],
+                        description: notes || 'India Transfer',
+                        amount: usd || (inr && rate ? (inr / rate).toFixed(2) : 0),
+                        rate: rate || (usd && inr ? (inr / usd).toFixed(2) : 0),
+                        secondaryAmount: inr || (usd && rate ? (usd * rate).toFixed(2) : 0),
+                        recipient: String(recipient),
+                        type: 'expense',
+                        category: 'India Transfer',
+                        isIndiaCorridor: true,
+                        isExcluded: status.includes('hidden'),
+                        source: 'Import',
+                        tags: []
+                    };
+                }).filter(Boolean);
+                
+                allParsed = [...allParsed, ...sheetParsed];
+            });
+            
+            if (allParsed.length > 0) resolve(allParsed);
+            else {
+                const err = `Could not detect data. Found headers: ${debugInfo.join(' | ')}`;
+                setImportError(err);
+                resolve([]);
+            }
+        } else {
+            resolve(parseRawText(XLSX.utils.sheet_to_csv(worksheet)));
+        }
       };
       reader.readAsArrayBuffer(file);
     });
@@ -469,58 +655,123 @@ function App() {
   };
 
   const parseRawText = (text) => {
-    // Attempt to find a year in the text (e.g., 2024, 2025) to avoid defaulting to 2001
-    const yearMatch = text.match(/\b20\d{2}\b/);
-    const statementYear = yearMatch ? yearMatch[0] : new Date().getFullYear().toString();
+    // Improved Year Detection: Find all years, filter out future ones, and pick the most frequent or highest
+    const allYears = text.match(/\b20\d{2}\b/g) || [];
+    const validYears = allYears.map(y => parseInt(y)).filter(y => y <= new Date().getFullYear() + 1);
+    
+    let statementYear = new Date().getFullYear().toString();
+    if (validYears.length > 0) {
+        // Count frequencies
+        const counts = {};
+        validYears.forEach(y => counts[y] = (counts[y] || 0) + 1);
+        // Sort by frequency descending, then by year descending
+        const sortedYears = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || b - a);
+        statementYear = sortedYears[0];
+    }
 
-    // Robust date regex: matches MM/DD/YYYY, YYYY-MM-DD, and also MMM DD (e.g., FEB 13)
-    const datePattern = /(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})|(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})|((?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s\d{1,2})/i;
-    const moneyPattern = /(-?\$?[\d,]+\.\d{2})\b/;
+    // DCU Specific: Pre-process text to identify sections
+    const isDCU = /DCU|Digital Federal Credit Union/i.test(text);
+    
+    // Robust date regex: matches MM/DD/YYYY, YYYY-MM-DD, MMM DD (with/out space), and MM/DD
+    const datePattern = /(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})|(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})|((?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s?\d{1,2})|(\b\d{1,2}\/\d{1,2}\b)/i;
+    const moneyPattern = /(-?\$?\s?[\d,]+\.\d{2})/;
     const results = [];
-    text.split(/\r?\n/).forEach(line => {
+    
+    // Start as unknown
+    let currentSection = 'unknown';
+    
+    const lines = text.split(/\r?\n/);
+    lines.forEach((line, idx) => {
+      const lowerLine = line.toLowerCase().trim();
+
+      // Section Detection for DCU
+      if (isDCU) {
+          if (lowerLine.includes('checking') && lowerLine.length < 60) currentSection = 'checking';
+          else if ((lowerLine.includes('savings') || lowerLine.includes('membership')) && lowerLine.length < 60) currentSection = 'savings';
+          else if ((lowerLine.includes('loan') || lowerLine.includes('mortgage') || lowerLine.includes('vehicle')) && lowerLine.length < 60) {
+              if (!lowerLine.includes('activity')) currentSection = 'loan';
+          }
+          else if (lowerLine.includes('deposits, dividends') || lowerLine.includes('withdrawals, fees') || lowerLine.includes('statement summary')) {
+              currentSection = 'ignore';
+          }
+      }
+
+      // Skip parsing if we are in loan or ignore sections
+      if (isDCU && (currentSection === 'loan' || currentSection === 'ignore' || currentSection === 'unknown')) return;
+
       const dMatch = line.match(datePattern);
       const mMatch = line.match(moneyPattern);
+      
       if (dMatch && mMatch) {
-        const amt = parseFloat(mMatch[0].replace(/[$,]/g, ''));
+        // Skip header/summary lines
+        if (lowerLine.includes('previous balance') || lowerLine.includes('new balance') || lowerLine.includes('total dividends') || lowerLine.includes('yield earned')) return;
+
+        const amt = parseFloat(mMatch[0].replace(/[$,\s]/g, ''));
         let desc = line.replace(dMatch[0], '').replace(mMatch[0], '').trim().replace(/^,|,$/g, '').trim();
+        
+        // DCU Multi-line Description Handling: JUST SHOW LINE 2 if it exists
+        if (isDCU && lines[idx + 1]) {
+            const nextLine = lines[idx + 1].trim();
+            const nextDateMatch = nextLine.match(datePattern);
+            if (!nextDateMatch && nextLine.length > 0 && !nextLine.toLowerCase().includes('balance') && !nextLine.toLowerCase().includes('page')) {
+                desc = nextLine; 
+            }
+        }
+
         if (desc.length > 2) {
             let dateObj = new Date(dMatch[0]);
             
-            // If shorthand date like "FEB 13" (Discover style), explicitly add the statement year
-            if (isNaN(dateObj.getTime()) || dateObj.getFullYear() <= 2001) {
-                if (/^[a-z]{3}\s\d{1,2}$/i.test(dMatch[0])) {
-                    dateObj = new Date(`${dMatch[0]} ${statementYear}`);
+            // Handle shorthand dates (MMM DD or MM/DD) by explicitly applying statementYear
+            // Groups 3 and 4 in datePattern are the shorthand formats
+            const isShorthand = dMatch[3] || dMatch[4];
+            
+            if (isShorthand || isNaN(dateObj.getTime()) || dateObj.getFullYear() <= 2001) {
+                const dateStr = dMatch[0].trim();
+                const mmmddMatch = dateStr.match(/^([a-z]{3})\s?(\d{1,2})$/i);
+                if (mmmddMatch) {
+                    dateObj = new Date(`${mmmddMatch[1]} ${mmmddMatch[2]} ${statementYear}`);
+                } 
+                else if (/^\d{1,2}\/\d{1,2}$/.test(dateStr)) {
+                    dateObj = new Date(`${dateStr}/${statementYear}`);
+                } else if (isShorthand) {
+                    // Fallback for other shorthand formats
+                    dateObj = new Date(`${dateStr} ${statementYear}`);
                 }
             }
             const isoDate = !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
             
-            // --- START CHANGE: Strengthened Rules ---
             const isDiscover = /DISCOVER/i.test(text);
-            const isSavings = /SAVINGS|CHECKING/i.test(text);
+            const isSavings = /SAVINGS|CHECKING/i.test(text) || (isDCU && (currentSection === 'savings' || currentSection === 'checking'));
             let autoCat = 'Uncategorized';
             
-            // Default logic: negative is income (refund), positive is expense
+            // Default logic: negative is income (for credit cards usually, or reversed logic elsewhere)
+            // But for Bank Statements (DCU), negative is EXPENSE.
             let type = amt < 0 ? 'income' : 'expense';
 
-            // Override for Discover
-            if (isDiscover) {
+            if (isDiscover || isDCU) {
                 if (isSavings) {
-                    // For Savings: Positive is usually income (deposit/interest), negative is withdrawal
-                    // But we often parse absolute values, so look for keywords
-                    if (/INTEREST|DEPOSIT|TRANSFER FROM|ZELLE.*FROM/i.test(desc)) type = 'income';
-                    else if (/WITHDRAWAL|TRANSFER TO|ZELLE.*TO|PURCHASE/i.test(desc)) type = 'expense';
-                    else type = amt < 0 ? 'expense' : 'income'; // Fallback
-                } else {
-                    // For CC: Spending is positive but is 'expense'. Payments/Credits are 'income'.
+                    // DCU Savings/Checking: Handle negative signs from withdrawal columns
+                    if (amt < 0 || /WITHDRAWAL|TRANSFER TO|ZELLE.*TO|PURCHASE|DEBIT|PAYMENT/i.test(desc)) type = 'expense';
+                    else if (amt > 0 || /INTEREST|DEPOSIT|TRANSFER FROM|ZELLE.*FROM|DIVIDEND|CREDIT/i.test(desc)) type = 'income';
+                } else if (isDiscover) {
                     if (/PAYMENT|DIRECTPAY|CREDIT/i.test(desc)) type = 'income';
                     else type = 'expense';
                 }
             } else {
-                // Non-Discover fallback
                 type = amt < 0 || /PAYMENT|DEPOSIT|INTEREST/i.test(desc) ? 'income' : 'expense';
             }
 
-            if (/Zelle.*from/i.test(desc)) {
+            // DCU Specific Categorization Overrides
+            if (isDCU && /DIVIDEND/i.test(desc)) {
+                autoCat = 'Interest';
+                type = 'income';
+            } else if (isDCU && /MOUNISHA GONA/i.test(desc)) {
+                autoCat = 'SENDTOMOUNI';
+                type = 'expense';
+            } else if (isDCU && /VHAGAR/i.test(desc)) {
+                autoCat = 'Car Payment';
+                type = 'expense';
+            } else if (/Zelle.*from/i.test(desc)) {
                 autoCat = 'ZelleRecieve';
                 type = 'income';
             } else if (/Zelle.*to/i.test(desc)) {
@@ -546,10 +797,10 @@ function App() {
                 if (inrMatch) secondaryAmount = inrMatch[1].replace(/,/g, '');
             }
 
-            const isExcluded = ['CC Payment', 'Transfer'].includes(autoCat);
+            const isExcluded = ['CC Payment', 'Transfer', 'SENDTOMOUNI'].includes(autoCat);
             results.push({
               tempId: Date.now() + Math.random(),
-              date: isoDate, description: desc.substring(0, 40),
+              date: isoDate, description: desc.substring(0, 100),
               amount: Math.abs(amt), 
               secondaryAmount,
               notes: '',
@@ -562,26 +813,112 @@ function App() {
   };
 
   const confirmImport = () => {
-      if (!importGlobalSource) {
-          setShowImportConfirmModal(true);
+      if (importToIndiaHub) {
+          const hasMissingRecipient = importPreview.some(tx => !tx.recipient);
+          if (hasMissingRecipient) {
+              setShowImportConfirmModal(true);
+          } else {
+              executeImport();
+          }
       } else {
-          executeImport();
+          if (!importGlobalSource) {
+              setShowImportConfirmModal(true);
+          } else {
+              executeImport();
+          }
       }
   };
 
   const executeImport = async () => {
+      if (!importPreview || importPreview.length === 0) return;
       setLoading(true);
+      const isIndiaImport = importToIndiaHub; // Capture context
+      
       try {
+          const batch = writeBatch(db);
+          const importedTxs = [];
+          const yearsToExpand = new Set();
+          const monthsToExpand = new Set();
+          const sourcesToSelect = new Set();
+          let firstTxDate = null;
+
           for (const tx of importPreview) {
               const { tempId: _tempId, ...finalTx } = tx; 
               if (importGlobalSource) finalTx.source = importGlobalSource;
-              await addDoc(collection(db, "users", user.uid, "transactions"), { ...finalTx, id: Date.now() + Math.random() });
+              if (isIndiaImport) finalTx.isIndiaCorridor = true;
+              
+              const txId = Date.now() + Math.random();
+              const docData = { ...finalTx, id: txId };
+              
+              // Create a new document reference for the batch
+              const newDocRef = doc(collection(db, "users", user.uid, "transactions"));
+              batch.set(newDocRef, docData);
+              
+              importedTxs.push({ ...docData, firestoreId: newDocRef.id });
+              
+              const [yStr, mStr] = tx.date.split('-');
+              if (yStr && mStr) {
+                  const txYear = parseInt(yStr);
+                  yearsToExpand.add(txYear);
+                  
+                  const monthName = new Date(txYear, parseInt(mStr) - 1).toLocaleString('default', { month: 'long' });
+                  monthsToExpand.add(`${txYear}-${monthName}`);
+              }
+
+              if (finalTx.source) sourcesToSelect.add(finalTx.source);
+              if (!firstTxDate) firstTxDate = tx.date;
           }
+          
+          await batch.commit();
+          
+          const sourceName = importGlobalSource || (isIndiaImport ? 'India Corridor' : 'Mixed Sources');
+          
+          // Ensure imported sources are visible
+          if (!selectedSource.includes('All Sources')) {
+              setSelectedSource(prev => {
+                  const next = new Set([...prev]);
+                  sourcesToSelect.forEach(s => next.add(s));
+                  return Array.from(next);
+              });
+          }
+
+          setExpandedYears(prev => {
+              const next = { ...prev };
+              yearsToExpand.forEach(y => next[y] = true);
+              return next;
+          });
+
+          setExpandedMonths(prev => {
+              const next = { ...prev };
+              monthsToExpand.forEach(mKey => next[mKey] = true);
+              return next;
+          });
+
+          if (firstTxDate) {
+              const [y, m] = firstTxDate.split('-').map(Number);
+              if (!isNaN(y) && !isNaN(m)) {
+                  setCalendarYear(y);
+                  setCalendarMonth(m - 1);
+                  setSelectedYears([y]);
+                  setViewMonth(m - 1);
+              }
+          }
+
+          logActivity('IMPORT', 'BULK', `Bulk Data Ingestion: ${importedTxs.length} records mapped to ${sourceName}`, { 
+              items: importedTxs,
+              source: sourceName,
+              count: importedTxs.length
+          }, isIndiaImport);
+
           setImportPreview(null);
           setImportGlobalSource('');
+          setImportToIndiaHub(false);
           setShowImportConfirmModal(false);
-          setActiveTab('history');
-      } catch(e) { alert(e.message); }
+          setActiveTab(isIndiaImport ? 'india' : 'history');
+      } catch(e) { 
+          console.error("Batch Import Failed:", e);
+          alert("Import failed: " + e.message); 
+      }
       setLoading(false);
   };
 
@@ -591,7 +928,12 @@ function App() {
     const sources = new Set(['Cash', 'Credit Card']);
     const tags = new Set(['Trip', 'Business']);
     transactions.forEach(t => {
-        if(t.category) cats.add(String(t.category));
+        if(t.category) {
+            const catStr = String(t.category);
+            // Normalize SENDTOMOUNI to uppercase to match CONFIG
+            if (catStr.toUpperCase() === 'SENDTOMOUNI') cats.add('SENDTOMOUNI');
+            else cats.add(catStr);
+        }
         if(t.source) sources.add(String(t.source));
         if(Array.isArray(t.tags)) t.tags.forEach(tag => tag && tag.trim() && tags.add(tag));
     });
@@ -608,8 +950,10 @@ function App() {
     const yearMatch = selectedYears.some(y => t.date.startsWith(y.toString()));
     const monthMatch = viewMode === 'month' ? t.date.startsWith(statsPrefix) : true;
     const sourceMatch = selectedSource.includes('All Sources') || selectedSource.includes(t.source);
-    return yearMatch && monthMatch && sourceMatch;
+    return yearMatch && monthMatch && sourceMatch && !t.isIndiaCorridor;
   });
+  
+  // INDIA HUB INDEPENDENCE: Exclude India Corridor transactions from main dashboard stats
   const validStatsTxs = allTimeTxs.filter(t => !t.isExcluded && !excludedCategories.includes(t.category));
   
   const earned = validStatsTxs.filter(t => t.type === 'income').reduce((a,b) => a+b.amount, 0);
@@ -653,7 +997,6 @@ function App() {
     const data = [];
     const now = new Date();
     const isYearlyGranularity = graphGranularity === 'yearly'; 
-    const isYearMode = viewMode === 'year'; 
 
     if (isYearlyGranularity || (viewMode === 'year' && selectedYears.length > 1)) {
         // Compare selected years
@@ -667,6 +1010,7 @@ function App() {
                 t.date.startsWith(prefix) && 
                 !t.isExcluded && 
                 !excludedCategories.includes(t.category) &&
+                !t.isIndiaCorridor &&
                 (selectedSource.includes('All Sources') || selectedSource.includes(t.source))
             );
             
@@ -700,6 +1044,7 @@ function App() {
                     t.date.startsWith(prefix) && 
                     !t.isExcluded && 
                     !excludedCategories.includes(t.category) &&
+                    !t.isIndiaCorridor &&
                     (selectedSource.includes('All Sources') || selectedSource.includes(t.source))
                 );
                 
@@ -731,6 +1076,7 @@ function App() {
                     t.date.startsWith(prefix) && 
                     !t.isExcluded && 
                     !excludedCategories.includes(t.category) &&
+                    !t.isIndiaCorridor &&
                     (selectedSource.includes('All Sources') || selectedSource.includes(t.source))
                 );
                 
@@ -825,7 +1171,7 @@ function App() {
 
   // --- HISTORY AGGREGATION ---
   const filteredHistoryTransactions = useMemo(() => {
-    let filtered = transactions;
+    let filtered = transactions.filter(t => !t.isIndiaCorridor);
     if (!selectedSource.includes('All Sources')) {
         filtered = filtered.filter(t => selectedSource.includes(t.source));
     }
@@ -867,6 +1213,17 @@ function App() {
   return (
     <div className="flex h-screen bg-white dark:bg-[#020202] font-sans text-gray-900 dark:text-white overflow-hidden transition-colors duration-700 select-none relative">
       <input id="global-file-input" type="file" className="opacity-0 absolute pointer-events-none w-0 h-0" accept=".pdf,.xlsx,.xls,.csv,.txt" onChange={(e) => processFile(e.target.files[0])} />
+      
+      {/* GLOBAL LOADER */}
+      {loading && (
+          <div className="fixed inset-0 z-[10000] bg-white/60 dark:bg-black/60 backdrop-blur-md flex items-center justify-center animate-fade-in">
+              <div className="flex flex-col items-center gap-6">
+                  <div className="w-20 h-20 border-4 border-blue-600 border-t-transparent rounded-full animate-spin shadow-2xl shadow-blue-600/20"></div>
+                  <p className="text-blue-600 dark:text-blue-400 font-black tracking-[0.4em] uppercase text-xs animate-pulse">Synchronizing Intelligence...</p>
+              </div>
+          </div>
+      )}
+
       {/* AMBIENT BACKGROUND ANIMATION */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 opacity-40 dark:opacity-60">
           <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[120px] animate-pulse"></div>
@@ -1285,7 +1642,7 @@ function App() {
                                     </div>
                                     <div className="p-8 relative group/cal">
                                         <CalendarHistory 
-                                            transactions={transactions.filter(t => selectedSource.includes('All Sources') || selectedSource.includes(t.source))}
+                                            transactions={transactions.filter(t => !t.isIndiaCorridor && (selectedSource.includes('All Sources') || selectedSource.includes(t.source)))}
                                             selectedDate={selectedDate}
                                             setSelectedDate={setSelectedDate}
                                             calendarMonth={calendarMonth}
@@ -1298,6 +1655,8 @@ function App() {
                                             formatCurrency={formatCurrency}
                                             excludedCategories={excludedCategories}
                                             isMini={true}
+                                            selectedTxIds={selectedTxIds}
+                                            onSelectTx={toggleSelectTx}
                                             onMonthYearChange={(m, y) => {
                                                 setViewMonth(m);
                                                 setSelectedYears([y]);
@@ -1528,7 +1887,7 @@ function App() {
                         {historyViewMode === 'calendar' ? (
                             <div className="relative group/cal">
                                 <CalendarHistory 
-                                    transactions={transactions.filter(t => selectedSource.includes('All Sources') || selectedSource.includes(t.source))}
+                                    transactions={transactions.filter(t => !t.isIndiaCorridor && (selectedSource.includes('All Sources') || selectedSource.includes(t.source)))}
                                     selectedDate={selectedDate}
                                     setSelectedDate={setSelectedDate}
                                     calendarMonth={calendarMonth}
@@ -1541,6 +1900,8 @@ function App() {
                                     formatCurrency={formatCurrency}
                                     getCategoryIcon={getCategoryIcon}
                                     excludedCategories={excludedCategories}
+                                    selectedTxIds={selectedTxIds}
+                                    onSelectTx={toggleSelectTx}
                                 />
                                 {selectedYears.length > 1 && (
                                     <div className="absolute inset-0 z-[60] flex items-center justify-center p-10 bg-white/60 dark:bg-[#0a0a0a]/80 backdrop-blur-3xl animate-in fade-in duration-700 rounded-[3rem]">
@@ -1612,8 +1973,7 @@ function App() {
                                         {expandedYears[year] && (
                                             <div className="p-10 pt-4 space-y-6 animate-slide-down">
                                                 {Object.entries(yearData.months).sort((a,b) => {
-                                                    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                                                    return months.indexOf(b[0]) - months.indexOf(a[0]);
+                                                    return MONTH_ORDER.indexOf(b[0]) - MONTH_ORDER.indexOf(a[0]);
                                                 }).map(([month, data]) => {
                                                     const monthKey = `${year}-${month}`;
                                                     const monthNet = data.income - data.expense;
@@ -1662,6 +2022,8 @@ function App() {
                                                                                 onFilterClick={(type, val) => openDrilldown(type, val, '', `${val} History`)}
                                                                                 isGlobalExcluded={excludedCategories.includes(tx.category)}
                                                                                 categoryIcons={categoryIcons}
+                                                                                isSelected={selectedTxIds.includes(tx.firestoreId)}
+                                                                                onSelect={() => toggleSelectTx(tx.firestoreId)}
                                                                             />
                                                                         ))}
                                                                     </div>
@@ -1681,31 +2043,170 @@ function App() {
 
                 {/* INDIA HUB TAB */}
                 {activeTab === 'india' && (() => {
-                    const indiaTxs = transactions.filter(t => t.category === 'India Transfer').sort((a,b) => new Date(b.date) - new Date(a.date));
-                    const totalUSD = indiaTxs.reduce((sum, t) => sum + Number(t.amount), 0);
-                    const totalINR = indiaTxs.reduce((sum, t) => sum + Number(t.secondaryAmount || 0), 0);
+                    const baseIndiaTxs = transactions.filter(t => t.isIndiaCorridor);
+                    
+                    let filteredByRecipient = [...baseIndiaTxs];
+                    if (indiaViewRecipient !== 'All Recipients') {
+                        filteredByRecipient = filteredByRecipient.filter(t => t.recipient === indiaViewRecipient);
+                    }
+
+                    const recipientsList = Array.from(new Set(baseIndiaTxs.map(t => t.recipient).filter(Boolean))).sort();
+                    
+                    const isYearlyGranularity = indiaGraphGranularity === 'yearly';
+                    const statsPrefix = indiaViewMode === 'month' ? `${indiaSelectedYears[0]}-${String(indiaViewMonth + 1).padStart(2, '0')}` : null;
+                    
+                    const activeTxs = filteredByRecipient.filter(t => {
+                        const hasAllYears = indiaSelectedYears.includes('All Years');
+                        const yearMatch = hasAllYears || indiaSelectedYears.some(y => t.date.startsWith(y.toString()));
+                        const monthMatch = indiaViewMode === 'month' ? t.date.startsWith(statsPrefix) : true;
+                        return yearMatch && monthMatch;
+                    }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+                    const totalUSD = activeTxs.reduce((sum, t) => sum + Number(t.amount), 0);
+                    const totalINR = activeTxs.reduce((sum, t) => sum + Number(t.secondaryAmount || 0), 0);
                     const avgRate = totalUSD > 0 ? (totalINR / totalUSD) : 0;
+
+                    // Timeline Graph Data
+                    const indiaGraphData = [];
+                    const now = new Date();
                     
-                    // Group by month for trend
-                    const indiaTrend = indiaTxs.reduce((acc, t) => {
-                        const month = t.date.substring(0, 7);
-                        if (!acc[month]) acc[month] = { month, usd: 0, inr: 0 };
-                        acc[month].usd += Number(t.amount);
-                        acc[month].inr += Number(t.secondaryAmount || 0);
-                        return acc;
-                    }, {});
+                    if (isYearlyGranularity || (indiaViewMode === 'year' && (indiaSelectedYears.length > 1 || indiaSelectedYears.includes('All Years')))) {
+                        let yearsToCompare = [...indiaSelectedYears];
+                        if (yearsToCompare.includes('All Years')) {
+                            const allYearsInTxs = Array.from(new Set(baseIndiaTxs.map(t => t.date.substring(0, 4))));
+                            yearsToCompare = allYearsInTxs.length > 0 ? allYearsInTxs.sort() : [now.getFullYear().toString()];
+                        } else {
+                            yearsToCompare.sort((a,b) => a - b);
+                        }
+
+                        yearsToCompare.forEach(y => {
+                            const prefix = `${y}`;
+                            const txs = filteredByRecipient.filter(t => t.date.startsWith(prefix) && !t.isExcluded);
+                            indiaGraphData.push({
+                                name: y.toString(),
+                                fullDate: prefix, 
+                                type: 'yearly', 
+                                usd: txs.reduce((s, t) => s + Number(t.amount), 0),
+                                inr: txs.reduce((s, t) => s + Number(t.secondaryAmount || 0), 0)
+                            });
+                        });
+                    } else {
+                        // Monthly bars for the focused year (even in month-filter mode)
+                        const yFocus = (typeof indiaSelectedYears[0] === 'number') ? indiaSelectedYears[0] : now.getFullYear();
+                        for (let i = 0; i < 12; i++) {
+                            const d = new Date(yFocus, i, 1);
+                            const prefix = `${yFocus}-${String(i + 1).padStart(2, '0')}`;
+                            const label = d.toLocaleString('default', { month: 'short' });
+
+                            const txs = filteredByRecipient.filter(t => t.date.startsWith(prefix) && !t.isExcluded);
+                            indiaGraphData.push({
+                                name: label,
+                                fullDate: prefix,
+                                type: 'monthly',
+                                usd: txs.reduce((s, t) => s + Number(t.amount), 0),
+                                inr: txs.reduce((s, t) => s + Number(t.secondaryAmount || 0), 0)
+                            });
+                        }
+                    }
+
+                    // Cumulative Data
+                    let cumUsdVal = 0;
+                    let cumInrVal = 0;
+                    const allYearsPresent = Array.from(new Set(baseIndiaTxs.map(t => parseInt(t.date.substring(0, 4))))).sort((a,b) => a-b);
+                    const startY = allYearsPresent.length > 0 ? allYearsPresent[0] : now.getFullYear();
+                    const endY = now.getFullYear();
                     
-                    const trendData = Object.values(indiaTrend).sort((a,b) => a.month.localeCompare(b.month)).map(d => ({
-                        name: new Date(d.month + '-02').toLocaleString('default', { month: 'short', year: '2-digit' }),
-                        usd: d.usd,
-                        inr: d.inr,
-                        rate: d.usd > 0 ? (d.inr / d.usd).toFixed(2) : 0
-                    }));
+                    const cumGraphData = [];
+                    for(let y = startY; y <= endY; y++) {
+                        const yrTxs = filteredByRecipient.filter(t => t.date.startsWith(`${y}`) && !t.isExcluded);
+                        const yearUsd = yrTxs.reduce((s, t) => s + Number(t.amount), 0);
+                        const yearInr = yrTxs.reduce((s, t) => s + Number(t.secondaryAmount || 0), 0);
+                        cumUsdVal += yearUsd;
+                        cumInrVal += yearInr;
+                        cumGraphData.push({ year: y.toString(), totalUsd: cumUsdVal, totalInr: cumInrVal });
+                    }
+
+                    const handleExportIndiaHub = () => {
+                        const wb = XLSX.utils.book_new();
+                        const rows = [];
+                        
+                        // Professional Header Section
+                        rows.push(['INDIA CORRIDOR - CAPITAL DEPLOYMENT MATRIX']);
+                        rows.push([`Generated: ${new Date().toLocaleString()}`]);
+                        rows.push(['Recipient:', indiaViewRecipient]);
+                        rows.push([]);
+
+                        // Global Totals Summary
+                        rows.push(['PORTFOLIO SUMMARY']);
+                        rows.push(['Total USD Deployed', totalUSD]);
+                        rows.push(['Total INR Received', totalINR]);
+                        rows.push(['Average Exchange Rate', avgRate.toFixed(2)]);
+                        rows.push([]);
+                        rows.push(['DETAILED TRANSACTION LEDGER']);
+                        rows.push(['Date', 'Recipient', 'USD Amount', 'Ex. Rate', 'INR Received', 'Source', 'Notes', 'Status']);
+
+                        // Group by Year for stylized grouping
+                        const years = [...new Set(activeTxs.map(t => t.date.substring(0, 4)))].sort((a, b) => b - a);
+                        
+                        years.forEach(yr => {
+                            const yrTxs = activeTxs.filter(t => t.date.startsWith(yr));
+                            const yrUsd = yrTxs.reduce((s, t) => s + Number(t.amount), 0);
+                            const yrInr = yrTxs.reduce((s, t) => s + Number(t.secondaryAmount || 0), 0);
+                            
+                            // Year Header
+                            rows.push([`--- YEAR: ${yr} ---`]);
+                            
+                            yrTxs.forEach(t => {
+                                rows.push([
+                                    t.date,
+                                    t.recipient || 'N/A',
+                                    Number(t.amount),
+                                    Number(t.rate || (t.amount > 0 ? (Number(t.secondaryAmount) / Number(t.amount)).toFixed(2) : 0)),
+                                    Number(t.secondaryAmount),
+                                    t.source,
+                                    t.notes || '',
+                                    t.isExcluded ? 'Hidden' : 'Visible'
+                                ]);
+                            });
+                            
+                            // Year Summary Row
+                            rows.push(['', `TOTAL FOR ${yr}`, yrUsd, (yrInr/yrUsd).toFixed(2), yrInr, '', '', '']);
+                            rows.push([]); // Spacer
+                        });
+
+                        const ws = XLSX.utils.aoa_to_sheet(rows);
+                        
+                        // Basic Column Widths
+                        ws['!cols'] = [
+                            {wch: 15}, {wch: 20}, {wch: 15}, {wch: 12}, {wch: 18}, {wch: 15}, {wch: 30}, {wch: 10}
+                        ];
+
+                        XLSX.utils.book_append_sheet(wb, ws, "India Transfers");
+                        XLSX.writeFile(wb, `India_Transfer_Matrix_${new Date().getFullYear()}.xlsx`);
+                    };
+
+                    const handleIndiaBarClick = (data) => {
+                        if (data && data.fullDate) {
+                            if (data.type === 'yearly') {
+                                setIndiaSelectedYears([parseInt(data.name)]);
+                                setIndiaGraphGranularity('monthly');
+                                setIndiaViewMode('year'); 
+                            } else {
+                                const [y, m] = data.fullDate.split('-');
+                                setIndiaSelectedYears([parseInt(y)]);
+                                if (m) {
+                                    setIndiaViewMonth(parseInt(m) - 1);
+                                    setIndiaViewMode('month');
+                                    setIndiaGraphGranularity('monthly');
+                                }
+                            }
+                        }
+                    };
 
                     return (
-                        <div className="max-w-6xl mx-auto space-y-12 animate-fade-in pb-20">
-                            {/* Header Section */}
-                            <div className="flex flex-col md:flex-row justify-between items-end gap-8">
+                        <div className="grid grid-cols-1 3xl:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
+                            {/* HEADER */}
+                            <div className="lg:col-span-12 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-10 mb-2 relative z-[100]">
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-4">
                                         <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
@@ -1715,128 +2216,283 @@ function App() {
                                             <h2 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">India <br /><span className="text-blue-600 dark:text-blue-500">Corridor.</span></h2>
                                         </div>
                                     </div>
-                                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1">Cross-Border Capital Deployment</p>
+                                    <div className="flex items-center gap-3 mt-4">
+                                        <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
+                                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Matrix: {indiaViewMode === 'month' ? `${MONTH_ORDER[indiaViewMonth]} ${indiaSelectedYears[0]}` : (indiaSelectedYears.includes('All Years') ? 'Portfolio Baseline' : indiaSelectedYears.join(' + '))}</span>
+                                        </div>
+                                        <div className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center gap-2 shadow-sm">
+                                            <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Recipient: {indiaViewRecipient}</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1 mt-4">Cross-Border Capital Deployment</p>
+                                    <div className="flex flex-wrap gap-4 mt-8">
+                                        <button onClick={() => setEditTx({isNew: true, category: 'India Transfer', description: 'USD to INR Transfer', type: 'expense', date: new Date().toISOString().split('T')[0], isIndiaCorridor: true, recipient: ''})} className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2"><Plus size={16}/> Manual Entry</button>
+                                        <button onClick={() => { setImportToIndiaHub(true); triggerFileUpload(); }} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shadow-blue-600/20"><UploadCloud size={16}/> Bulk Import</button>
+                                        <button onClick={handleExportIndiaHub} className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shadow-emerald-600/20"><FileInput size={16}/> Export Matrix</button>
+                                        <button onClick={() => setShowIndiaAuditModal(true)} className="px-8 py-4 bg-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shadow-purple-600/20"><History size={16}/> Audit Log</button>
+                                    </div>
                                 </div>
-                                <div className="flex gap-4">
-                                    <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl p-6 rounded-[2.5rem] border border-gray-100 dark:border-white/5 shadow-xl min-w-[200px]">
-                                        <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1">Avg Exchange Rate</p>
-                                        <p className="text-3xl font-black text-blue-600 dark:text-blue-400">₹{avgRate.toFixed(2)}</p>
+
+                                <div className="flex flex-col md:flex-row items-end gap-4 order-1 xl:order-2">
+                                    {indiaViewMode === 'month' || !indiaSelectedYears.includes('All Years') ? (
+                                        <button 
+                                            onClick={() => {
+                                                setIndiaViewMode('year');
+                                                setIndiaSelectedYears(['All Years']);
+                                                setIndiaViewRecipient('All Recipients');
+                                            }}
+                                            className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all mb-1 group flex items-center gap-2"
+                                        >
+                                            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform"/> Reset Portfolio
+                                        </button>
+                                    ) : null}
+
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-fit group hover:border-blue-500/30 transition-all duration-500">
+                                        <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
+                                            <Globe size={16} className="text-blue-600 dark:text-blue-400" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
+                                        </div>
+                                        <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
+                                    </div>
+
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-fit group hover:border-blue-500/30 transition-all duration-500">
+                                        {indiaViewMode === 'month' ? (
+                                            <>
+                                                <button onClick={() => setIndiaViewMode('year')} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">Monthly</button>
+                                                <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
+                                                <CustomDropdown value={indiaViewMonth} onChange={(m) => { setIndiaViewMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: MONTH_ORDER[i] }))} />
+                                            </>
+                                        ) : (
+                                            <button onClick={() => setIndiaViewMode('month')} className="px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-[0_20px_50px_rgba(37,99,235,0.3)] transition-all hover:scale-105 active:scale-95">Annual Overview</button>
+                                        )}
+                                        <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
+                                        {indiaViewMode === 'month' ? (
+                                            <CustomDropdown 
+                                                value={typeof indiaSelectedYears[0] === 'number' ? indiaSelectedYears[0] : today.getFullYear()} 
+                                                onChange={(y) => { setIndiaSelectedYears([y]); }} 
+                                                options={Array.from({length: 10}, (_, i) => ({ value: today.getFullYear() - 5 + i, label: (today.getFullYear() - 5 + i).toString() }))} 
+                                            />
+                                        ) : (
+                                            <MultiSelectDropdown options={['All Years', ...Array.from({length: 10}, (_, i) => today.getFullYear() - 5 + i)]} selected={indiaSelectedYears} onChange={(years) => { setIndiaSelectedYears(years); }} />
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                <div className="bg-gray-900 dark:bg-white/[0.03] backdrop-blur-3xl p-10 rounded-[3rem] shadow-2xl relative overflow-hidden group border border-transparent dark:border-white/5">
-                                    <div className="relative z-10">
-                                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-4">Total Deployed (USD)</p>
-                                        <p className="text-5xl font-black text-white tracking-tighter">${totalUSD.toLocaleString()}</p>
-                                        <div className="mt-8 flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-widest">
-                                            <TrendingUp size={14} /> Active Capital
+                            {/* CONTENT */}
+                            <div className="lg:col-span-12 3xl:col-span-7 space-y-10">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    <div className="bg-indigo-600 dark:bg-indigo-600 p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02]">
+                                        <div className="relative z-10">
+                                            <p className="text-[10px] font-black text-indigo-100 uppercase tracking-[0.4em] mb-4">Capital Deployed (USD)</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter">${totalUSD.toLocaleString()}</p>
                                         </div>
+                                        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+                                        <div className="absolute top-0 right-0 p-8 opacity-20"><TrendingUp size={48} className="text-white" /></div>
                                     </div>
-                                    <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-600/20 rounded-full blur-3xl"></div>
-                                </div>
-                                
-                                <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 group">
-                                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em] mb-4">Capital Received (INR)</p>
-                                    <p className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter">₹{(totalINR/100000).toFixed(2)}L</p>
-                                    <div className="mt-8 flex items-center gap-2 text-gray-400 text-xs font-black uppercase tracking-widest">
-                                        Total: ₹{totalINR.toLocaleString('en-IN')}
+
+                                    <div className="bg-emerald-600 dark:bg-emerald-600 p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(16,185,129,0.3)] relative overflow-hidden group border border-emerald-500/20 transition-all hover:scale-[1.02]">
+                                        <div className="relative z-10">
+                                            <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-4">Received Value (INR)</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter">{formatINR(totalINR)}</p>
+                                            <div className="mt-4 text-emerald-100/60 text-[10px] font-black uppercase tracking-[0.2em]">₹{totalINR.toLocaleString('en-IN')}</div>
+                                        </div>
+                                        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+                                        <div className="absolute top-0 right-0 p-8 opacity-20"><CreditCard size={48} className="text-white" /></div>
+                                    </div>
+
+                                    <div className="bg-slate-900 dark:bg-white/5 backdrop-blur-3xl p-10 rounded-[3rem] shadow-2xl relative overflow-hidden group border border-slate-800 dark:border-white/10 transition-all hover:scale-[1.02]">
+                                        <div className="relative z-10 flex flex-col justify-center h-full">
+                                            <p className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.4em] mb-4">Avg Efficiency</p>
+                                            <p className="text-5xl font-black text-white tracking-tighter">₹{avgRate.toFixed(2)}</p>
+                                            <div className="mt-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest">{activeTxs.length} Strategic Transfers</div>
+                                        </div>
+                                        <div className="absolute top-0 right-0 p-8 opacity-10"><Zap size={48} className="text-white" /></div>
                                     </div>
                                 </div>
 
-                                <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 flex flex-col justify-center">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">Efficiency</span>
-                                        <span className="text-xs font-black text-blue-600 dark:text-blue-400">OPTIMAL</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-gray-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-600 w-[85%] rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)]"></div>
-                                    </div>
-                                    <p className="mt-4 text-[10px] font-bold text-gray-400 dark:text-gray-500 leading-relaxed uppercase tracking-wider">Capital velocity maintained across {indiaTxs.length} transfer cycles.</p>
-                                </div>
-                            </div>
-
-                            {/* Chart Section */}
-                            <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5">
-                                <div className="flex justify-between items-center mb-12">
-                                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Transfer Timeline</h3>
-                                    <div className="flex gap-2">
-                                        <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                            <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">USD Flow</span>
+                                <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 transition-all">
+                                    <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+                                        <div className="flex flex-wrap items-center gap-4">
+                                            <div className="flex bg-gray-100/50 dark:bg-white/5 p-1.5 rounded-2xl border border-gray-200/50 dark:border-white/10 shadow-inner transition-all">
+                                                {indiaViewMode !== 'year' && ['6M', 'YTD', '1Y'].map(r => (
+                                                    <button key={r} onClick={() => setIndiaGraphRange(r)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${indiaGraphRange === r ? 'bg-white dark:bg-gray-600 shadow-[0_8px_30px_rgb(0,0,0,0.1)] text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}>{r}</button>
+                                                ))}
+                                            </div>
+                                            <div className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">Transfer Timeline</div>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="h-80 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={trendData}>
-                                            <defs>
-                                                <linearGradient id="colorUsd" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
-                                                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "rgba(255,255,255,0.03)" : "#f1f5f9"} />
-                                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} dy={15} />
-                                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
-                                            <Tooltip 
-                                                content={({ active, payload, label }) => {
+                                    <div className="h-96 w-full relative">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <ComposedChart data={indiaGraphData}>
+                                                <defs>
+                                                    <linearGradient id="colorIndiaUsd" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/><stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "rgba(255,255,255,0.03)" : "#f1f5f9"} />
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} dy={15} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
+                                                <Tooltip cursor={{ fill: darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', radius: 16 }} content={({ active, payload, label }) => {
                                                     if (active && payload && payload.length) {
+                                                        const d = payload[0].payload;
                                                         return (
-                                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-white/10 min-w-[200px] animate-in fade-in zoom-in duration-300">
-                                                                <p className="font-black text-gray-900 dark:text-white mb-3 text-[10px] uppercase tracking-widest border-b dark:border-white/5 pb-2">{label}</p>
-                                                                <div className="space-y-2">
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <span className="text-gray-400 font-bold">USD Sent</span>
-                                                                        <span className="font-black dark:text-white">${payload[0].value.toLocaleString()}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-xs">
-                                                                        <span className="text-gray-400 font-bold">INR Value</span>
-                                                                        <span className="font-black text-blue-600 dark:text-blue-400">₹{payload[0].payload.inr.toLocaleString('en-IN')}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between text-[10px] pt-2 border-t dark:border-white/5 mt-2">
-                                                                        <span className="text-gray-500 font-bold">RATE</span>
-                                                                        <span className="font-black text-gray-900 dark:text-white">₹{payload[0].payload.rate}</span>
-                                                                    </div>
+                                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/10 min-w-[240px] z-[9999]">
+                                                                <p className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest border-b dark:border-white/5 pb-3">{label} Transfers</p>
+                                                                <div className="space-y-3">
+                                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">USD Sent</span><span className="text-xl font-black dark:text-white">${d.usd.toLocaleString()}</span></div>
+                                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">INR Recv.</span><span className="text-lg font-black dark:text-gray-300">{formatINR(d.inr)}</span></div>
                                                                 </div>
                                                             </div>
                                                         );
                                                     }
                                                     return null;
-                                                }}
-                                            />
-                                            <Area type="monotone" dataKey="usd" stroke="#2563eb" strokeWidth={4} fillOpacity={1} fill="url(#colorUsd)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+                                                }} />
+                                                <Bar dataKey="usd" fill="url(#colorIndiaUsd)" radius={[12, 12, 12, 12]} barSize={32} onClick={handleIndiaBarClick} cursor="pointer">
+                                                    {indiaGraphData.map((entry, index) => (<Cell key={`cell-${index}`} fill="url(#colorIndiaUsd)" opacity={entry.fullDate === statsPrefix ? 1 : 0.6} stroke={entry.fullDate === statsPrefix ? "#2563eb" : "none"} strokeWidth={entry.fullDate === statsPrefix ? 2 : 0} />))}
+                                                </Bar>
+                                            </ComposedChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                                
+                                <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl p-8 rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 transition-all">
+                                    <div className="flex justify-between items-center mb-12">
+                                        <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Cumulative Capital</h3>
+                                        <div className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">All-Time Growth</div>
+                                    </div>
+                                    <div className="h-80 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={cumGraphData}>
+                                                <defs>
+                                                    <linearGradient id="colorIndiaCumUsd" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "rgba(255,255,255,0.03)" : "#f1f5f9"} />
+                                                <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} dy={15} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
+                                                <Tooltip content={({ active, payload, label }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const d = payload[0].payload;
+                                                        return (
+                                                            <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-white/10 min-w-[200px] z-[9999]">
+                                                                <p className="font-black text-gray-900 dark:text-white mb-6 text-[10px] uppercase tracking-widest border-b dark:border-white/5 pb-2">End of {label}</p>
+                                                                <div className="space-y-3 pt-2">
+                                                                    <div className="flex justify-between items-center"><span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Total USD</span><span className="font-black text-xl text-emerald-500 dark:text-emerald-400 ml-4">${d.totalUsd.toLocaleString()}</span></div>
+                                                                    <div className="flex justify-between items-center"><span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Total INR</span><span className="font-black text-lg text-blue-500 dark:text-blue-400 ml-4">{formatINR(d.totalInr)}</span></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }} />
+                                                <Area type="monotone" dataKey="totalUsd" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorIndiaCumUsd)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Transaction History */}
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center px-4">
-                                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Transfer Ledger</h3>
-                                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{indiaTxs.length} Cycles Logged</span>
-                                </div>
-                                <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 overflow-hidden">
-                                    {indiaTxs.map(tx => (
-                                        <TransactionRow 
-                                            key={tx.firestoreId} 
-                                            tx={tx} 
-                                            onClick={() => setEditTx(tx)} 
-                                            onFilterClick={(type, val) => openDrilldown(type, val, '', `${val} History`)}
-                                            isGlobalExcluded={false}
-                                            categoryIcons={categoryIcons}
-                                        />
-                                    ))}
-                                    {indiaTxs.length === 0 && (
-                                        <div className="p-20 text-center">
-                                            <p className="text-gray-400 font-bold">No India Transfer records found.</p>
-                                        </div>
-                                    )}
+                            <div className="hidden 3xl:block 3xl:col-span-5 space-y-10">
+                                <div className="sticky top-8 space-y-6">
+                                    <div className="flex justify-between items-center px-4">
+                                        <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Transfer Ledger</h3>
+                                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">{activeTxs.length} Records</span>
+                                    </div>
+                                    <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 overflow-hidden max-h-[85vh] overflow-y-auto custom-scrollbar">
+                                        {activeTxs.map(tx => (
+                                            <TransactionRow key={tx.firestoreId} tx={tx} onClick={() => setEditTx(tx)} onFilterClick={(type, val) => {}} isGlobalExcluded={false} categoryIcons={categoryIcons} isSelected={selectedTxIds.includes(tx.firestoreId)} onSelect={() => toggleSelectTx(tx.firestoreId)} />
+                                        ))}
+                                        {activeTxs.length === 0 && (
+                                            <div className="p-20 text-center">
+                                                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No records found for selection.</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
+
+                            {/* AUDIT LOG MODAL */}
+                            {showIndiaAuditModal && (
+                                <Popup title="Corridor Audit Log" onClose={() => setShowIndiaAuditModal(false)} zIndex={2000} size="xl" fullHeight>
+                                    <div className="flex-1 flex flex-col bg-white dark:bg-transparent overflow-hidden">
+                                        <div className="p-8 border-b dark:border-white/5 flex justify-between items-center shrink-0">
+                                            <div className="space-y-1">
+                                                <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Corridor Activity</h3>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">India Hub History Management</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-3">
+                                            {activityLogs.filter(log => log.isIndiaCorridor).length === 0 && (
+                                                <div className="text-center py-20 text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">No corridor activity recorded.</div>
+                                            )}
+                                            {activityLogs.filter(log => log.isIndiaCorridor).map(log => {
+                                                const date = log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString('default', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now';
+                                                const isExpanded = expandedLogs[log.id];
+                                                const actionColors = {
+                                                    'ADD': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+                                                    'EDIT': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+                                                    'DELETE': 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+                                                    'IMPORT': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+                                                    'BULK_DELETE': 'bg-rose-500/20 text-rose-600 border-rose-500/30',
+                                                    'BULK_EDIT': 'bg-blue-500/20 text-blue-600 border-blue-500/30'
+                                                };
+                                                return (
+                                                    <div key={log.id} className="bg-gray-50 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl overflow-hidden transition-all shadow-sm">
+                                                        <div onClick={() => setExpandedLogs(prev => ({ ...prev, [log.id]: !isExpanded }))} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors gap-4">
+                                                            <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                                                                <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black border uppercase tracking-widest shrink-0 ${actionColors[log.action] || actionColors['EDIT']}`}>{log.action.replace('_', ' ')}</span>
+                                                                <span className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-tight truncate">{log.description}</span>
+                                                                {log.changes?.count && (
+                                                                    <span className="hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gray-500/10 text-gray-500 text-[8px] font-black uppercase tracking-widest border border-gray-500/20">
+                                                                        {log.changes.count} ITEMS
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-4 shrink-0">
+                                                                <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">{date}</span>
+                                                                <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}><ChevronDown size={14} className="text-gray-400" /></div>
+                                                            </div>
+                                                        </div>
+                                                        {isExpanded && (
+                                                            <div className="px-4 pb-4 space-y-4 animate-slide-down border-t dark:border-white/5 pt-4">
+                                                                <div className="bg-white/5 rounded-xl p-4 border dark:border-white/5">
+                                                                    <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed uppercase">
+                                                                        {log.action === 'IMPORT' && `Corridor ingestion successful. Sync point: ${log.changes.source}.`}
+                                                                        {log.action === 'BULK_DELETE' && `Purge protocol executed. ${log.changes.count} corridor records removed (${log.changes.label}).`}
+                                                                        {log.action === 'ADD' && `New transfer vector initialized: ${log.description}.`}
+                                                                        {log.action === 'EDIT' && `Transfer intelligence updated for: ${log.description}.`}
+                                                                    </p>
+                                                                    {log.changes.items && (
+                                                                        <div className="mt-4 pt-4 border-t border-white/5">
+                                                                            <div className="flex justify-between items-center mb-3">
+                                                                                <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Complete Resource Manifest ({log.changes.items.length} Vectors):</p>
+                                                                                {log.action === 'IMPORT' && (
+                                                                                    <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'group', group: log.changes.items, label: `Imported Batch (${log.changes.source})` }); }} className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border border-rose-500/20">Purge Ingestion</button>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                                                                {log.changes.items.map((item, idx) => (
+                                                                                    <div key={idx} className="flex justify-between text-[9px] font-bold text-gray-500 dark:text-gray-400">
+                                                                                        <span>{item.description} (to {item.recipient || 'N/A'})</span>
+                                                                                        <span>${Number(item.amount).toFixed(0)}</span>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </Popup>
+                            )}
                         </div>
                     );
                 })()}
@@ -1846,35 +2502,90 @@ function App() {
         {/* POPUPS (EDIT ON TOP z-500) */}
         {editTx && (
             <Popup title={editTx.isNew ? 'New Entry' : 'Edit Entry'} onClose={() => setEditTx(null)} zIndex={500}>
-                <TransactionForm 
-                    initialData={editTx.isNew ? {} : editTx} 
-                    onSave={handleSave} 
-                    onDelete={!editTx.isNew ? () => setDeleteConfirm({ type: 'single', id: editTx.firestoreId }) : null} 
-                    allCategories={allCategories} 
-                    allSources={allSources}
-                    allTags={allTags}
-                    isCategoryExcluded={excludedCategories.includes(editTx.category)}
-                />
+                {editTx.isIndiaCorridor ? (
+                    <IndiaTransferForm 
+                        initialData={editTx.isNew ? {isIndiaCorridor: true, category: 'India Transfer', ...editTx} : editTx}
+                        onSave={handleSave}
+                        onDelete={!editTx.isNew ? () => setDeleteConfirm({ type: 'single', id: editTx.firestoreId }) : null}
+                    />
+                ) : (
+                    <TransactionForm 
+                        initialData={editTx.isNew ? {} : editTx} 
+                        onSave={handleSave} 
+                        onDelete={!editTx.isNew ? () => setDeleteConfirm({ type: 'single', id: editTx.firestoreId }) : null} 
+                        allCategories={allCategories} 
+                        allSources={allSources}
+                        allTags={allTags}
+                        isCategoryExcluded={excludedCategories.includes(editTx.category)}
+                    />
+                )}
             </Popup>
         )}
         
         {/* IMPORT PREVIEW POPUP (z-100) */}
         {importPreview && (
-            <Popup title={`Import Preview (${importPreview.length} Items)`} onClose={() => setImportPreview(null)} wide zIndex={100}>
+            <Popup title={importToIndiaHub ? `India Transfer Ingestion (${importPreview.length} Records)` : `Import Preview (${importPreview.length} Items)`} onClose={() => { setImportPreview(null); setImportToIndiaHub(false); }} wide zIndex={100}>
                 <div className="flex flex-col h-[70vh]">
-                     {/* GLOBAL SOURCE SELECTOR */}
-                     <div className="bg-blue-50 dark:bg-blue-500/10 p-6 rounded-3xl flex items-center justify-between gap-6 mb-8 border border-blue-100 dark:border-blue-500/20 shadow-inner">
-                         <div className="flex items-center gap-3">
-                            <CreditCard size={20} className="text-blue-600 dark:text-blue-400" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Default Origin Protocol:</span>
-                         </div>
-                         <div className="w-80">
-                             <CreatableCategorySelect 
-                                value={importGlobalSource} 
-                                onChange={setImportGlobalSource} 
-                                options={allSources} 
-                                placeholder="Select Source (e.g. Amex)"
-                             />
+                     {/* GLOBAL SELECTORS */}
+                     <div className="bg-blue-50 dark:bg-blue-500/10 p-6 rounded-3xl flex flex-wrap items-center justify-between gap-6 mb-8 border border-blue-100 dark:border-blue-500/20 shadow-inner">
+                         <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+                            {importToIndiaHub ? (
+                                <div className="flex items-center gap-3">
+                                    <Globe size={20} className="text-blue-600 dark:text-blue-400" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Default Recipient:</span>
+                                    <div className="w-64">
+                                        <input 
+                                            className="w-full bg-white dark:bg-[#0a0a0a] p-3 rounded-xl font-black text-[10px] uppercase tracking-widest outline-none border border-transparent focus:border-blue-500/30 dark:text-white"
+                                            placeholder="Assign to (e.g. Family)"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                const next = importPreview.map(tx => ({ ...tx, recipient: val }));
+                                                setImportPreview(next);
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center gap-3">
+                                        <CreditCard size={20} className="text-blue-600 dark:text-blue-400" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Origin:</span>
+                                        <div className="w-48">
+                                            <CreatableCategorySelect 
+                                                value={importGlobalSource} 
+                                                onChange={setImportGlobalSource} 
+                                                options={allSources} 
+                                                placeholder="Source (e.g. DCU)"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Calendar size={20} className="text-blue-600 dark:text-blue-400" />
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Force Year:</span>
+                                        <div className="w-32">
+                                            <select 
+                                                className="w-full bg-white dark:bg-[#0a0a0a] p-3 rounded-xl font-black text-[10px] uppercase tracking-widest outline-none border border-transparent focus:border-blue-500/30 dark:text-white"
+                                                onChange={(e) => {
+                                                    const newYear = e.target.value;
+                                                    if (!newYear) return;
+                                                    const nextPreview = importPreview.map(tx => {
+                                                        const parts = tx.date.split('-');
+                                                        parts[0] = newYear;
+                                                        return { ...tx, date: parts.join('-') };
+                                                    });
+                                                    setImportPreview(nextPreview);
+                                                }}
+                                                defaultValue=""
+                                            >
+                                                <option value="">Detect</option>
+                                                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map(y => (
+                                                    <option key={y} value={y}>{y}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                          </div>
                      </div>
 
@@ -1884,11 +2595,14 @@ function App() {
                                 <tr className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] sticky top-0 bg-white dark:bg-[#0a0a0a] z-20">
                                     <th className="p-4 w-10"></th>
                                     <th className="p-4 w-32 text-left">Date</th>
+                                    {importToIndiaHub && <th className="p-4 w-40 text-left">Recipient</th>}
                                     <th className="p-4 text-left">Description</th>
-                                    <th className="p-4 w-28 text-left">Amt ($)</th>
+                                    <th className="p-4 w-28 text-left">USD ($)</th>
+                                    {importToIndiaHub && <th className="p-4 w-24 text-left">Rate (₹)</th>}
+                                    {importToIndiaHub && <th className="p-4 w-32 text-left">INR Received</th>}
                                     <th className="p-4 w-24 text-left">Flow</th>
-                                    <th className="p-4 w-48 text-left">Category</th>
-                                    <th className="p-4 w-32 text-left">Tags</th>
+                                    {!importToIndiaHub && <th className="p-4 w-48 text-left">Category</th>}
+                                    {!importToIndiaHub && <th className="p-4 w-32 text-left">Tags</th>}
                                     <th className="p-4 w-10"></th>
                                 </tr>
                             </thead>
@@ -1903,8 +2617,35 @@ function App() {
                                             </button>
                                         </td>
                                         <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors"><input className="w-full bg-transparent outline-none font-black text-[10px] dark:text-white uppercase tracking-widest" value={tx.date} onChange={e => { const n = [...importPreview]; n[idx].date = e.target.value; setImportPreview(n); }} /></td>
+                                        {importToIndiaHub && (
+                                            <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
+                                                <input className="w-full bg-transparent outline-none font-bold text-[10px] dark:text-white uppercase" placeholder="Recipient" value={tx.recipient || ''} onChange={e => { const n = [...importPreview]; n[idx].recipient = e.target.value; setImportPreview(n); }} />
+                                            </td>
+                                        )}
                                         <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors"><input className="w-full bg-transparent outline-none font-bold text-xs dark:text-white uppercase tracking-tight" value={tx.description} onChange={e => { const n = [...importPreview]; n[idx].description = e.target.value; setImportPreview(n); }} /></td>
-                                        <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors"><input className="w-full bg-transparent outline-none font-black text-xs dark:text-white" value={tx.amount} onChange={e => { const n = [...importPreview]; n[idx].amount = e.target.value; setImportPreview(n); }} /></td>
+                                        <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
+                                            <input className="w-full bg-transparent outline-none font-black text-xs dark:text-white" value={tx.amount} onChange={e => { 
+                                                const n = [...importPreview]; 
+                                                n[idx].amount = e.target.value; 
+                                                if (n[idx].rate) n[idx].secondaryAmount = (parseFloat(e.target.value) * parseFloat(n[idx].rate)).toFixed(2);
+                                                setImportPreview(n); 
+                                            }} />
+                                        </td>
+                                        {importToIndiaHub && (
+                                            <>
+                                                <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
+                                                    <input className="w-full bg-transparent outline-none font-black text-[10px] text-blue-600 dark:text-blue-400" placeholder="0.00" value={tx.rate || ''} onChange={e => { 
+                                                        const n = [...importPreview]; 
+                                                        n[idx].rate = e.target.value; 
+                                                        if (n[idx].amount) n[idx].secondaryAmount = (parseFloat(n[idx].amount) * parseFloat(e.target.value)).toFixed(2);
+                                                        setImportPreview(n); 
+                                                    }} />
+                                                </td>
+                                                <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
+                                                    <input className="w-full bg-transparent outline-none font-black text-[10px] text-emerald-600 dark:text-emerald-400" placeholder="0.00" value={tx.secondaryAmount || ''} onChange={e => { const n = [...importPreview]; n[idx].secondaryAmount = e.target.value; setImportPreview(n); }} />
+                                                </td>
+                                            </>
+                                        )}
                                         <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
                                             <select 
                                                 className="bg-transparent text-[10px] font-black uppercase tracking-widest outline-none dark:text-white"
@@ -1915,26 +2656,30 @@ function App() {
                                                 <option value="income">IN</option>
                                             </select>
                                         </td>
-                                        <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
-                                            <CreatableCategorySelect 
-                                                value={tx.category} 
-                                                onChange={(val) => { 
-                                                    const n = [...importPreview]; 
-                                                    n[idx].category = val; 
-                                                    if (val === 'ExpenseReport' || val === 'OverDrive') n[idx].type = 'income';
-                                                    setImportPreview(n); 
-                                                }} 
-                                                options={allCategories}
-                                            />
-                                        </td>
-                                        <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
-                                            <CreatableCategorySelect 
-                                                value={tx.tags && tx.tags[0] ? tx.tags[0] : ''} 
-                                                onChange={(val) => { const n = [...importPreview]; n[idx].tags = [val]; setImportPreview(n); }} 
-                                                options={allTags}
-                                                placeholder="Tag"
-                                            />
-                                        </td>
+                                        {!importToIndiaHub && (
+                                            <>
+                                                <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
+                                                    <CreatableCategorySelect 
+                                                        value={tx.category} 
+                                                        onChange={(val) => { 
+                                                            const n = [...importPreview]; 
+                                                            n[idx].category = val; 
+                                                            if (val === 'ExpenseReport' || val === 'OverDrive') n[idx].type = 'income';
+                                                            setImportPreview(n); 
+                                                        }} 
+                                                        options={allCategories}
+                                                    />
+                                                </td>
+                                                <td className="p-4 bg-gray-50 dark:bg-white/[0.02] group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
+                                                    <CreatableCategorySelect 
+                                                        value={tx.tags && tx.tags[0] ? tx.tags[0] : ''} 
+                                                        onChange={(val) => { const n = [...importPreview]; n[idx].tags = [val]; setImportPreview(n); }} 
+                                                        options={allTags}
+                                                        placeholder="Tag"
+                                                    />
+                                                </td>
+                                            </>
+                                        )}
                                         <td className="p-4 bg-gray-50 dark:bg-white/[0.02] rounded-r-2xl group-hover:bg-blue-50 dark:group-hover:bg-blue-600/10 transition-colors">
                                             <button onClick={() => setImportPreview(importPreview.filter((_, i) => i !== idx))} className="text-rose-400 hover:text-rose-600 transition-colors"><X size={18}/></button>
                                         </td>
@@ -1975,24 +2720,41 @@ function App() {
                 <div className="space-y-4">
                     <div className="flex items-center gap-3 text-amber-600 bg-amber-50 p-4 rounded-xl">
                         <AlertCircle size={24} />
-                        <p className="text-sm font-bold">No default payment method selected.</p>
+                        <p className="text-sm font-bold">{importToIndiaHub ? 'No recipients defined.' : 'No default payment method selected.'}</p>
                     </div>
-                    <p className="text-gray-600 text-sm">You can select one now to apply to all imported transactions, or ignore to leave them blank.</p>
+                    <p className="text-gray-600 text-sm">
+                        {importToIndiaHub 
+                            ? 'You can select a default recipient now to apply to all blank entries, or continue to leave them as is.' 
+                            : 'You can select one now to apply to all imported transactions, or ignore to leave them blank.'}
+                    </p>
                     
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Payment Method</label>
-                        <CreatableCategorySelect 
-                            value={importGlobalSource} 
-                            onChange={setImportGlobalSource} 
-                            options={allSources} 
-                            placeholder="Select Source (e.g. Amex)" 
-                        />
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">{importToIndiaHub ? 'Default Recipient' : 'Payment Method'}</label>
+                        {importToIndiaHub ? (
+                            <input 
+                                className="w-full bg-gray-50 dark:bg-white/[0.03] p-4 rounded-xl font-black text-[10px] uppercase tracking-widest border border-transparent focus:bg-white dark:focus:bg-[#0a0a0a] focus:border-blue-500/30 outline-none transition-all dark:text-white shadow-inner"
+                                placeholder="Recipient Name (e.g. Family)"
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    const next = importPreview.map(tx => ({ ...tx, recipient: tx.recipient || val }));
+                                    setImportPreview(next);
+                                }}
+                            />
+                        ) : (
+                            <CreatableCategorySelect 
+                                value={importGlobalSource} 
+                                onChange={setImportGlobalSource} 
+                                options={allSources} 
+                                placeholder="Select Source (e.g. Amex)" 
+                            />
+                        )}
                     </div>
 
-                                         <div className="flex gap-3 pt-6 mt-4 border-t dark:border-gray-700 transition-colors">
-                                            <button onClick={executeImport} className="flex-1 py-4 rounded-2xl font-black bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-all">Ignore & Continue</button>
-                                            <button onClick={executeImport} className="flex-1 py-4 rounded-2xl font-black bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none transition-all">Confirm Import</button>
-                                        </div>                </div>
+                    <div className="flex gap-3 pt-6 mt-4 border-t dark:border-gray-700 transition-colors">
+                        <button onClick={executeImport} className="flex-1 py-4 rounded-2xl font-black bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-all">Ignore & Continue</button>
+                        <button onClick={executeImport} className="flex-1 py-4 rounded-2xl font-black bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200 dark:shadow-none transition-all">Confirm Import</button>
+                    </div>
+                </div>
             </Popup>
         )}
 
@@ -2091,23 +2853,31 @@ function App() {
                             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-3">
                                 {manageTab === 'audit' && (
                                     <div className="space-y-3">
-                                        {activityLogs.filter(log => log.description.toLowerCase().includes(manageSearch.toLowerCase())).length === 0 && (
+                                        {activityLogs.filter(log => !log.isIndiaCorridor && log.description.toLowerCase().includes(manageSearch.toLowerCase())).length === 0 && (
                                             <div className="text-center py-20 text-gray-400 text-[10px] font-black uppercase tracking-[0.3em]">No activity found in filter.</div>
                                         )}
-                                        {activityLogs.filter(log => log.description.toLowerCase().includes(manageSearch.toLowerCase())).map(log => {
+                                        {activityLogs.filter(log => !log.isIndiaCorridor && log.description.toLowerCase().includes(manageSearch.toLowerCase())).map(log => {
                                             const date = log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString('default', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Just now';
                                             const isExpanded = expandedLogs[log.id];
                                             const actionColors = {
                                                 'ADD': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
                                                 'EDIT': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-                                                'DELETE': 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                                                'DELETE': 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+                                                'IMPORT': 'bg-purple-500/10 text-purple-500 border-purple-500/20',
+                                                'BULK_DELETE': 'bg-rose-500/20 text-rose-600 border-rose-500/30',
+                                                'BULK_EDIT': 'bg-blue-500/20 text-blue-600 border-blue-500/30'
                                             };
                                             return (
                                                 <div key={log.id} className="bg-gray-50 dark:bg-white/[0.02] border border-gray-100 dark:border-white/5 rounded-2xl overflow-hidden transition-all shadow-sm">
                                                     <div onClick={() => setExpandedLogs(prev => ({ ...prev, [log.id]: !isExpanded }))} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-white/[0.04] transition-colors gap-4">
                                                         <div className="flex items-center gap-3 flex-1 overflow-hidden">
-                                                            <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black border uppercase tracking-widest shrink-0 ${actionColors[log.action] || actionColors['EDIT']}`}>{log.action}</span>
+                                                            <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black border uppercase tracking-widest shrink-0 ${actionColors[log.action] || actionColors['EDIT']}`}>{log.action.replace('_', ' ')}</span>
                                                             <span className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-tight truncate">{log.description}</span>
+                                                            {(log.action === 'IMPORT' || log.action === 'BULK_DELETE' || log.action === 'BULK_EDIT') && log.changes?.count && (
+                                                                <span className="hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-gray-500/10 text-gray-500 text-[8px] font-black uppercase tracking-widest border border-gray-500/20">
+                                                                    {log.changes.count} ITEMS
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-4 shrink-0">
                                                             <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest hidden sm:block">{date}</span>
@@ -2117,7 +2887,7 @@ function App() {
                                                     {isExpanded && (
                                                         <div className="px-4 pb-4 space-y-4 animate-slide-down border-t dark:border-white/5 pt-4">
                                                             <div className="flex flex-wrap gap-2">
-                                                                {(log.changes?.after || log.changes?.before) && (() => {
+                                                                {(log.action === 'ADD' || log.action === 'EDIT' || log.action === 'DELETE') && (log.changes?.after || log.changes?.before) && (() => {
                                                                     const ctx = log.changes?.after || log.changes?.before;
                                                                     return (
                                                                         <>
@@ -2127,6 +2897,53 @@ function App() {
                                                                         </>
                                                                     );
                                                                 })()}
+                                                                {(log.action === 'IMPORT' || log.action === 'BULK_DELETE' || log.action === 'BULK_EDIT') && (
+                                                                    <div className="w-full space-y-3">
+                                                                        <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                                            {log.action === 'IMPORT' ? <UploadCloud size={14} /> : (log.action === 'BULK_DELETE' ? <Trash2 size={14} /> : <Edit2 size={14} />)} 
+                                                                            {log.action.replace('_', ' ')} Manifest
+                                                                        </div>
+                                                                        <div className="bg-white/5 rounded-xl p-4 border dark:border-white/5">
+                                                                            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 leading-relaxed uppercase">
+                                                                                {log.action === 'IMPORT' && `Ingestion of ${log.changes.count} records successful. All entries synchronized to index point: ${log.changes.source}.`}
+                                                                                {log.action === 'BULK_DELETE' && `Purge protocol executed. ${log.changes.count} records permanently removed from the archive (${log.changes.label}).`}
+                                                                                {log.action === 'BULK_EDIT' && `Refactor protocol executed. ${log.changes.count} records modified. Type: ${log.changes.editType}, Target: ${log.changes.originalValue}.`}
+                                                                            </p>
+                                                                                                                                                                {log.changes.items && (
+                                                                                                                                                                                                                                                            <div className="mt-4 pt-4 border-t border-white/5">
+                                                                                                                                                                                                                                                                <div className="flex justify-between items-center mb-3">
+                                                                                                                                                                                                                                                                    <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Complete Resource Manifest ({log.changes.items.length} Vectors):</p>
+                                                                                                                                                                                                                                                                    {log.action === 'IMPORT' && (
+                                                                                                                                                                                                                                                                        <button 
+                                                                                                                                                                                                                                                                            onClick={(e) => {
+                                                                                                                                                                                                                                                                                e.stopPropagation();
+                                                                                                                                                                                                                                                                                setDeleteConfirm({ 
+                                                                                                                                                                                                                                                                                    type: 'group', 
+                                                                                                                                                                                                                                                                                    group: log.changes.items, 
+                                                                                                                                                                                                                                                                                    label: `Imported Batch (${log.changes.source})` 
+                                                                                                                                                                                                                                                                                });
+                                                                                                                                                                                                                                                                            }}
+                                                                                                                                                                                                                                                                            className="px-3 py-1 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border border-rose-500/20"
+                                                                                                                                                                                                                                                                        >
+                                                                                                                                                                                                                                                                            Purge Ingestion
+                                                                                                                                                                                                                                                                        </button>
+                                                                                                                                                                                                                                                                    )}
+                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                                                                                <div className="space-y-1 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+                                                                                                                                                                    
+                                                                                                                                                                            {log.changes.items.map((item, idx) => (
+                                                                                                                                                                                <div key={idx} className="flex justify-between text-[9px] font-bold text-gray-500 dark:text-gray-400">
+                                                                                                                                                                                    <span className="truncate pr-4">{item.description}</span>
+                                                                                                                                                                                    <span className="shrink-0">${Number(item.amount).toFixed(0)}</span>
+                                                                                                                                                                                </div>
+                                                                                                                                                                            ))}
+                                                                                                                                                                        </div>
+                                                                                                                                                                    </div>
+                                                                                                                                                                )}
+                                                                            
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             {log.action === 'EDIT' && log.changes?.before && log.changes?.after && (
                                                                 <div className="space-y-2 mt-1">
@@ -2302,6 +3119,34 @@ function App() {
                 </div>
             </Popup>
         )}
+        {/* BULK ACTION BAR */}
+        {selectedTxIds.length > 0 && (
+            <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[8000] animate-slide-up">
+                <div className="bg-gray-900 dark:bg-white text-white dark:text-black px-10 py-6 rounded-[2.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.5)] border border-white/10 dark:border-black/5 flex items-center gap-10 backdrop-blur-3xl">
+                    <div className="flex items-center gap-4 border-r border-white/10 dark:border-black/10 pr-10">
+                        <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black">{selectedTxIds.length}</div>
+                        <p className="text-xs font-black uppercase tracking-widest">Records Selected</p>
+                    </div>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => {
+                                const group = transactions.filter(t => selectedTxIds.includes(t.firestoreId));
+                                setDeleteConfirm({ type: 'group', group, label: `${selectedTxIds.length} Selected Records` });
+                            }}
+                            className="flex items-center gap-3 px-6 py-3 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-rose-600/20"
+                        >
+                            <Trash2 size={16}/> Purge Selection
+                        </button>
+                        <button 
+                            onClick={() => setSelectedTxIds([])}
+                            className="flex items-center gap-3 px-6 py-3 bg-white/10 dark:bg-black/5 hover:bg-white/20 dark:hover:bg-black/10 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                        >
+                            <X size={16}/> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
       </main>
     </div>
   );
@@ -2309,7 +3154,7 @@ function App() {
 
 // --- SUB COMPONENTS ---
 
-const MultiSelectDropdown = ({ options, selected, onChange, label }) => {
+const MultiSelectDropdown = ({ options, selected, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef(null);
     useEffect(() => {
@@ -2355,7 +3200,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, label }) => {
     );
 };
 
-const CalendarHistory = ({ transactions, selectedDate, setSelectedDate, calendarMonth, setCalendarMonth, calendarYear, setCalendarYear, onEditTx, onFilterClick, categoryIcons, formatCurrency, excludedCategories, isMini, onMonthYearChange }) => {
+const CalendarHistory = ({ transactions, selectedDate, setSelectedDate, calendarMonth, setCalendarMonth, calendarYear, setCalendarYear, onEditTx, onFilterClick, categoryIcons, formatCurrency, excludedCategories, isMini, onMonthYearChange, selectedTxIds, onSelectTx }) => {
     const [showDayPopup, setShowDayPopup] = useState(false);
     const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
     const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1).getDay();
@@ -2569,10 +3414,12 @@ const CalendarHistory = ({ transactions, selectedDate, setSelectedDate, calendar
                                 <TransactionRow 
                                     key={tx.firestoreId} 
                                     tx={tx} 
-                                    onClick={() => { setEditTx(tx); setShowDayPopup(false); }} 
+                                    onClick={() => { onEditTx(tx); setShowDayPopup(false); }} 
                                     onFilterClick={onFilterClick}
                                     isGlobalExcluded={excludedCategories.includes(tx.category)}
                                     categoryIcons={categoryIcons}
+                                    isSelected={selectedTxIds.includes(tx.firestoreId)}
+                                    onSelect={() => onSelectTx(tx.firestoreId)}
                                 />
                             ))
                         ) : (
@@ -2596,18 +3443,29 @@ const CalendarHistory = ({ transactions, selectedDate, setSelectedDate, calendar
     );
 };
 
-const TransactionRow = ({ tx, onClick, onFilterClick, isGlobalExcluded, categoryIcons }) => {
+const TransactionRow = ({ tx, onClick, onFilterClick, isGlobalExcluded, categoryIcons, isSelected, onSelect }) => {
     const isExcluded = tx.isExcluded || isGlobalExcluded;
     return (
-        <div className={`flex justify-between items-center p-6 hover:bg-gray-50 dark:hover:bg-white/[0.03] cursor-pointer border-b border-gray-50 dark:border-white/5 last:border-0 transition-all group ${isExcluded ? 'opacity-40 grayscale' : ''}`} onClick={onClick}>
+        <div className={`flex justify-between items-center p-6 hover:bg-gray-50 dark:hover:bg-white/[0.03] cursor-pointer border-b border-gray-50 dark:border-white/5 last:border-0 transition-all group ${isExcluded ? 'opacity-40 grayscale' : ''} ${isSelected ? 'bg-blue-50 dark:bg-blue-600/10' : ''}`} onClick={onClick}>
             <div className="flex items-center gap-6">
+                <div 
+                    onClick={(e) => { e.stopPropagation(); onSelect(!isSelected); }}
+                    className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-200 dark:border-white/10 text-transparent'}`}
+                >
+                    <Check size={14} strokeWidth={4} />
+                </div>
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-sm ${tx.type === 'income' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white' : 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 group-hover:bg-rose-500 group-hover:text-white'}`}>
                     {isExcluded ? <EyeOff size={24}/> : (tx.type === 'income' ? <TrendingUp size={24}/> : <TrendingDown size={24}/>)}
                 </div>
                 <div className="space-y-1.5">
                     <div className="flex items-center gap-3">
                         <p className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-tight">{tx.description}</p>
-                        {tx.source && tx.source !== 'Cash' && 
+                        {tx.isIndiaCorridor && tx.recipient && (
+                            <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-lg font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-blue-500/20">
+                                <Globe size={10}/> {tx.recipient}
+                            </span>
+                        )}
+                        {tx.source && tx.source !== 'Cash' && !tx.isIndiaCorridor && 
                             <span 
                                 onClick={(e) => { e.stopPropagation(); onFilterClick('source', tx.source); }}
                                 className="text-[9px] bg-gray-100 dark:bg-white/5 hover:bg-blue-600 dark:hover:bg-blue-600 hover:text-white px-2 py-0.5 rounded-lg text-gray-500 dark:text-gray-400 font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-1.5 border border-transparent dark:border-white/5"
@@ -2618,6 +3476,7 @@ const TransactionRow = ({ tx, onClick, onFilterClick, isGlobalExcluded, category
                     </div>
                     <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                         <span className="flex items-center gap-1.5"><Calendar size={12}/> {tx.date}</span>
+                        {tx.rate && <span className="text-blue-500 dark:text-blue-400 font-black">₹{tx.rate}/$</span>}
                         <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-white/10"></span>
                         <span 
                             onClick={(e) => { e.stopPropagation(); onFilterClick('category', tx.category); }}
@@ -2974,6 +3833,125 @@ const TransactionForm = ({ initialData, onSave, onDelete, allCategories, allSour
                 {onDelete && (
                     <button onClick={onDelete} className="w-full text-rose-500 dark:text-rose-400 py-3 font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all">
                         Purge Request
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const IndiaTransferForm = ({ initialData, onSave, onDelete }) => {
+    const [formData, setFormData] = useState({
+        id: initialData.firestoreId || null,
+        date: initialData.date || new Date().toISOString().split('T')[0],
+        desc: initialData.description || 'USD to INR Transfer',
+        amount: initialData.amount || '',
+        rate: initialData.rate || '',
+        secondaryAmount: initialData.secondaryAmount || '',
+        recipient: initialData.recipient || '',
+        notes: initialData.notes || '',
+        isExcluded: initialData.isExcluded || false,
+        isIndiaCorridor: true,
+        type: 'expense',
+        category: 'India Transfer'
+    });
+
+    const calculateInr = (usd, rate) => {
+        if (usd && rate) return (parseFloat(usd) * parseFloat(rate)).toFixed(2);
+        return formData.secondaryAmount;
+    };
+
+    const handleUsdChange = (val) => {
+        const inr = calculateInr(val, formData.rate);
+        setFormData(prev => ({ ...prev, amount: val, secondaryAmount: inr }));
+    };
+
+    const handleRateChange = (val) => {
+        const inr = calculateInr(formData.amount, val);
+        setFormData(prev => ({ ...prev, rate: val, secondaryAmount: inr }));
+    };
+
+    const handleInrChange = (val) => {
+        setFormData(prev => ({ ...prev, secondaryAmount: val }));
+    };
+
+    return (
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex gap-6">
+                <div className="flex-1 space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Transfer Date</label>
+                    <CustomDatePicker value={formData.date} onChange={date => setFormData({...formData, date})} />
+                </div>
+                <div className="flex-1 flex items-end">
+                    <button 
+                        onClick={() => setFormData(p => ({...p, isExcluded: !p.isExcluded}))}
+                        className={`w-full h-[70px] rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl ${formData.isExcluded ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}
+                    >
+                        {formData.isExcluded ? <><EyeOff size={20}/> Hidden Protocol</> : <><Eye size={20}/> Visible Hub</>}
+                    </button>
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Recipient Identifier</label>
+                <input 
+                    className="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-black text-sm uppercase tracking-widest outline-none dark:text-white transition-all shadow-inner" 
+                    placeholder="Who is receiving the capital? (e.g. Self, Family)" 
+                    value={formData.recipient} 
+                    onChange={e => setFormData({...formData, recipient: e.target.value})} 
+                />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Capital (USD)</label>
+                    <input 
+                        type="number" 
+                        className="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 p-6 rounded-2xl text-xl font-black outline-none h-[70px] dark:text-white shadow-inner" 
+                        placeholder="0.00" 
+                        value={formData.amount} 
+                        onChange={e => handleUsdChange(e.target.value)} 
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1">Dollar Rate (₹)</label>
+                    <input 
+                        type="number" 
+                        className="w-full bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/20 p-6 rounded-2xl text-xl font-black outline-none h-[70px] text-blue-700 dark:text-blue-400 shadow-inner" 
+                        placeholder="0.00" 
+                        value={formData.rate} 
+                        onChange={e => handleRateChange(e.target.value)} 
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest ml-1">Received (INR)</label>
+                    <input 
+                        type="number" 
+                        className="w-full bg-emerald-50/50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/20 p-6 rounded-2xl text-xl font-black outline-none h-[70px] text-emerald-700 dark:text-emerald-400 shadow-inner" 
+                        placeholder="0.00" 
+                        value={formData.secondaryAmount} 
+                        onChange={e => handleInrChange(e.target.value)} 
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-2 pb-4">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Transfer Intelligence</label>
+                <textarea 
+                    className="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-bold text-xs outline-none dark:text-white transition-all shadow-inner min-h-[120px] resize-none" 
+                    placeholder="Append transfer notes or context..." 
+                    value={formData.notes} 
+                    onChange={e => setFormData({...formData, notes: e.target.value})} 
+                />
+            </div>
+
+            <div className="pt-6 border-t dark:border-white/5 flex flex-col gap-4">
+                <button onClick={() => onSave(formData)} className="w-full bg-blue-600 text-white py-6 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-blue-600/30 hover:scale-[1.02] active:scale-95 transition-all">
+                    {formData.id ? 'Authorize Corridor Update' : 'Initialize India Transfer'}
+                </button>
+                {onDelete && (
+                    <button onClick={onDelete} className="w-full text-rose-500 dark:text-rose-400 py-3 font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all">
+                        Purge Record
                     </button>
                 )}
             </div>
