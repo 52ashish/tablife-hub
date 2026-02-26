@@ -175,6 +175,7 @@ function App() {
   const [showIndiaAuditModal, setShowIndiaAuditModal] = useState(false);
   const [showImportConfirmModal, setShowImportConfirmModal] = useState(false); 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [navDrawerOpen, setNavDrawerOpen] = useState(false);
 
   const [expandedYears, setExpandedYears] = useState({ [today.getFullYear()]: true });
   const [expandedMonths, setExpandedMonths] = useState({});
@@ -1236,14 +1237,14 @@ function App() {
           <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-blue-400/5 rounded-full blur-[100px] animate-pulse delay-700"></div>
       </div>
 
-      <aside className="hidden md:flex w-72 flex-col bg-gray-50/50 dark:bg-white/[0.01] backdrop-blur-3xl border-r border-gray-200 dark:border-white/5 z-30 transition-all duration-700">
+      <aside className="hidden lg:flex w-72 flex-col bg-gray-50/50 dark:bg-white/[0.01] backdrop-blur-3xl border-r border-gray-200 dark:border-white/5 z-30 transition-all duration-700">
         <div className="p-8">
             <div className="flex items-center gap-3 group cursor-pointer">
                 <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform">
                     <LayoutDashboard size={22} />
                 </div>
                 <div>
-                    <h1 className="text-xl font-black tracking-tighter uppercase">TabLife.</h1>
+                    <h1 className="text-xl font-black tracking-tighter uppercase dark:text-white">TabLife.</h1>
                     <p className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 leading-none">Intelligence Hub</p>
                 </div>
             </div>
@@ -1281,7 +1282,7 @@ function App() {
                         <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-[#050505] rounded-full"></div>
                     </div>
                     <div className="overflow-hidden">
-                        <p className="text-xs font-black truncate">{user.displayName.split(' ')[0]}</p>
+                        <p className="text-xs font-black truncate dark:text-white">{user.displayName.split(' ')[0]}</p>
                         <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-tight">Standard Plan</p>
                     </div>
                 </div>
@@ -1290,9 +1291,49 @@ function App() {
         </div>
       </aside>
 
+      {/* MOBILE NAV DRAWER */}
+      {navDrawerOpen && (
+          <div className="lg:hidden fixed inset-0 z-[200] animate-fade-in">
+              <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setNavDrawerOpen(false)}></div>
+              <div className="absolute left-0 top-0 bottom-0 w-80 bg-white dark:bg-[#0a0a0a] shadow-2xl p-8 flex flex-col animate-in slide-in-from-left duration-300">
+                  <div className="flex justify-between items-center mb-12">
+                      <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black italic">TL</div>
+                          <span className="text-2xl font-black tracking-tighter dark:text-white">TabLife.</span>
+                      </div>
+                      <button onClick={() => setNavDrawerOpen(false)} className="p-2 text-gray-400 hover:text-blue-600 transition-colors"><X size={24} /></button>
+                  </div>
+                  
+                  <nav className="flex-1 space-y-2">
+                      <SidebarItem icon={<LayoutDashboard size={20} />} label="Overview" active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setNavDrawerOpen(false); }} />
+                      <SidebarItem icon={<Globe size={20} />} label="India Hub" active={activeTab === 'india'} onClick={() => { setActiveTab('india'); setNavDrawerOpen(false); }} />
+                      <SidebarItem icon={<PlusCircle size={20} />} label="Activity" active={activeTab === 'activity'} onClick={() => { setActiveTab('activity'); setNavDrawerOpen(false); }} />
+                      <SidebarItem icon={<History size={20} />} label="Ledger" active={activeTab === 'history'} onClick={() => { setActiveTab('history'); setNavDrawerOpen(false); }} />
+                      <SidebarItem icon={<Settings size={20} />} label="Settings" active={false} onClick={() => { setShowManageModal(true); setNavDrawerOpen(false); }} />
+                  </nav>
+
+                  <div className="mt-auto pt-8 border-t dark:border-white/5">
+                      <div className="flex items-center gap-4 mb-8">
+                          <img src={user.photoURL} className="w-12 h-12 rounded-xl border border-gray-200 dark:border-white/10" />
+                          <div>
+                              <p className="font-black dark:text-white">{user.displayName}</p>
+                              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest uppercase">Portfolio Architect</p>
+                          </div>
+                      </div>
+                      <button onClick={() => signOut(auth)} className="w-full py-4 bg-rose-500/10 text-rose-600 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"><LogOut size={18}/> Authorize Exit</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       <main className="flex-1 flex flex-col h-full overflow-hidden relative z-20">
-        <header className="md:hidden flex justify-between items-center p-4 bg-white dark:bg-[#0a0a0a] border-b border-gray-200 dark:border-white/5 relative z-50 transition-colors">
-            <h1 className="font-black text-blue-600 text-lg tracking-tighter">TabLife.</h1>
+        <header className="lg:hidden flex justify-between items-center p-4 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/5 relative z-50 transition-colors">
+            <div className="flex items-center gap-4">
+                <button onClick={() => setNavDrawerOpen(true)} className="p-2 text-gray-900 dark:text-white hover:text-blue-600 transition-colors">
+                    <Menu size={24} />
+                </button>
+                <h1 className="font-black text-blue-600 text-lg tracking-tighter">TabLife.</h1>
+            </div>
             <div className="flex items-center gap-3">
                 <button onClick={() => setDarkMode(!darkMode)} className="p-2 text-gray-500 dark:text-gray-400">
                     {darkMode ? <Sun size={20} /> : <Moon size={20} />}
@@ -1311,18 +1352,18 @@ function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-white dark:bg-transparent transition-colors custom-scrollbar">
-            <div className="max-w-[2400px] mx-auto space-y-12">
+            <div className="max-w-[1920px] mx-auto space-y-12">
                 {activeTab === 'dashboard' && (
-                    <div className="grid grid-cols-1 3xl:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
                         {/* MAIN DASHBOARD HEADER - HIGH LEVEL CONTEXT */}
                         <div className="lg:col-span-12 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-10 mb-2 relative z-[100]">
                             <div className="space-y-4">
                                 <div className="space-y-1">
-                                    <h2 className="text-7xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">Strategic <br /><span className="text-blue-600 dark:text-blue-500 animate-pulse">Wealth.</span></h2>
-                                    <div className="flex items-center gap-3 mt-4">
+                                    <h2 className="text-4xl md:text-7xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">Strategic <br /><span className="text-blue-600 dark:text-blue-500 animate-pulse">Wealth.</span></h2>
+                                    <div className="flex flex-wrap items-center gap-3 mt-4">
                                         <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-                                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Matrix: {viewMode === 'month' ? `${new Date(0, viewMonth).toLocaleString('default', { month: 'long' })} ${selectedYears[0]}` : (selectedYears.includes('All Years') ? 'Portfolio Baseline' : selectedYears.join(' + '))}</span>
+                                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Matrix: {viewMode === 'month' ? `${MONTH_ORDER[viewMonth]} ${selectedYears[0]}` : (selectedYears.includes('All Years') ? 'Portfolio Baseline' : selectedYears.join(' + '))}</span>
                                         </div>
                                         <div className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center gap-2 shadow-sm">
                                             <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Stream: {selectedSource.includes('All Sources') ? 'Total Portfolio' : selectedSource.join(' + ')}</span>
@@ -1332,8 +1373,8 @@ function App() {
                                 </div>
                             </div>
 
-                            <div className="flex flex-col md:flex-row items-end gap-4 order-1 xl:order-2">
-                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-fit group hover:border-blue-500/30 transition-all duration-500">
+                            <div className="flex flex-col md:flex-row items-start md:items-end gap-4 order-1 xl:order-2 w-full md:w-auto">
+                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
                                     <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
                                         <CreditCard size={16} className="text-blue-600 dark:text-blue-400" />
                                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Source</span>
@@ -1346,12 +1387,12 @@ function App() {
                                     />
                                 </div>
 
-                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-fit group hover:border-blue-500/30 transition-all duration-500">
+                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
                                     {viewMode === 'month' ? (
                                         <>
                                             <button onClick={() => setViewMode('year')} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">Monthly</button>
                                             <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
-                                            <CustomDropdown value={viewMonth} onChange={(m) => { setViewMonth(m); setCalendarMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: new Date(0, i).toLocaleString('default', { month: 'long' }) }))} />
+                                            <CustomDropdown value={viewMonth} onChange={(m) => { setViewMonth(m); setCalendarMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: MONTH_ORDER[i] }))} />
                                         </>
                                     ) : (
                                         <button onClick={() => setViewMode('month')} className="px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-[0_20px_50px_rgba(37,99,235,0.3)] transition-all hover:scale-105 active:scale-95">Annual Overview</button>
@@ -1376,7 +1417,7 @@ function App() {
                         </div>
 
                         {/* MAIN DASHBOARD CONTENT */}
-                        <div className="lg:col-span-12 3xl:col-span-7 space-y-10">
+                        <div className="lg:col-span-8 space-y-10">
                             {/* TOP METRIC PILLS - ALIGNED LEFT WITH CONTENT */}
                             <div className="flex flex-wrap gap-6 w-full">
                                 <MetricCapsule label="Revenue Stream" amount={earned} icon={<TrendingUp size={28}/>} color="text-emerald-500 dark:text-emerald-400" bgColor="bg-emerald-50/50 dark:bg-emerald-500/5" borderColor="border-emerald-100 dark:border-emerald-500/20" onClick={() => openDrilldown('type', 'income', statsPrefix, 'Income Details')} />
@@ -1630,7 +1671,7 @@ function App() {
                         </div>
 
                         {/* RIGHT SIDEBAR: CALENDAR & ACTIVITY */}
-                        <div className="hidden 3xl:block 3xl:col-span-5 space-y-10">
+                        <div className="lg:col-span-4 space-y-10">
                             <div className="sticky top-8 space-y-10">
                                 {/* MINI CALENDAR CARD */}
                                 <div className="bg-white dark:bg-white/[0.03] backdrop-blur-3xl rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-100 dark:border-white/5 group overflow-hidden transition-all duration-700 h-full">
@@ -1778,9 +1819,9 @@ function App() {
 
                 {/* COMBINED ACTIVITY TAB */}
                 {activeTab === 'activity' && (
-                    <div className="max-w-4xl mx-auto space-y-12 animate-fade-in py-20">
+                    <div className="max-w-4xl mx-auto space-y-12 animate-fade-in py-20 px-4">
                         <div className="text-center space-y-4">
-                            <h2 className="text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Activity <br/><span className="text-blue-600">Nexus.</span></h2>
+                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Activity <br/><span className="text-blue-600">Nexus.</span></h2>
                             <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">Operational Entry Protocol</p>
                         </div>
 
@@ -1831,7 +1872,7 @@ function App() {
                     <div className="space-y-12 animate-fade-in py-10 relative z-10">
                         <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-4 relative z-[100]">
                                                         <div className="space-y-4">
-                                                            <h2 className="text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Chronicle <br/><span className="text-blue-600">Archive.</span></h2>
+                                                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Chronicle <br/><span className="text-blue-600">Archive.</span></h2>
                                                             {historyViewMode === 'calendar' && (
                                                                 <div className="flex items-center gap-3">
                                                                     <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
@@ -2301,7 +2342,7 @@ function App() {
                     };
 
                     return (
-                        <div className="grid grid-cols-1 3xl:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
                             {/* HEADER */}
                             <div className="lg:col-span-12 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-10 mb-2 relative z-[100]">
                                 <div className="space-y-4">
@@ -2310,7 +2351,7 @@ function App() {
                                             <Globe size={32} />
                                         </div>
                                         <div>
-                                            <h2 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">India <br /><span className="text-blue-600 dark:text-blue-500">Corridor.</span></h2>
+                                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">India <br /><span className="text-blue-600 dark:text-blue-500">Corridor.</span></h2>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 mt-4">
@@ -2331,7 +2372,7 @@ function App() {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col md:flex-row items-end gap-4 order-1 xl:order-2">
+                                <div className="flex flex-col md:flex-row items-start md:items-end gap-4 order-1 xl:order-2 w-full md:w-auto">
                                     {indiaViewMode === 'month' || !indiaSelectedYears.includes('All Years') ? (
                                         <button 
                                             onClick={() => {
@@ -2339,13 +2380,13 @@ function App() {
                                                 setIndiaSelectedYears(['All Years']);
                                                 setIndiaViewRecipient('All Recipients');
                                             }}
-                                            className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all mb-1 group flex items-center gap-2"
+                                            className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all mb-1 group flex items-center gap-2 w-full md:w-auto"
                                         >
                                             <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform"/> Reset Portfolio
                                         </button>
                                     ) : null}
 
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-fit group hover:border-blue-500/30 transition-all duration-500">
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
                                         <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
                                             <Globe size={16} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
@@ -2353,7 +2394,7 @@ function App() {
                                         <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
                                     </div>
 
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-fit group hover:border-blue-500/30 transition-all duration-500">
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
                                         {indiaViewMode === 'month' ? (
                                             <>
                                                 <button onClick={() => setIndiaViewMode('year')} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">Monthly</button>
@@ -2378,7 +2419,7 @@ function App() {
                             </div>
 
                             {/* CONTENT */}
-                            <div className="lg:col-span-12 3xl:col-span-7 space-y-10">
+                            <div className="lg:col-span-8 space-y-10">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="bg-indigo-600 dark:bg-indigo-600 p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02]">
                                         <div className="relative z-10">
@@ -2492,7 +2533,7 @@ function App() {
                                 </div>
                             </div>
 
-                            <div className="hidden 3xl:block 3xl:col-span-5 space-y-10">
+                            <div className="lg:col-span-4 space-y-10">
                                 <div className="sticky top-8 space-y-6">
                                     <div className="flex justify-between items-center px-4">
                                         <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Transfer Ledger</h3>
@@ -3861,7 +3902,7 @@ const TransactionForm = ({ initialData, onSave, onDelete, allCategories, allSour
     return (
         <div className="space-y-8 animate-fade-in">
             {/* Top Bar: Date & Exclude Toggle */}
-            <div className="flex gap-6">
+            <div className="flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-2">
                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Archive Date</label>
                     <CustomDatePicker value={formData.date} onChange={date => setFormData({...formData, date})} />
@@ -3882,30 +3923,30 @@ const TransactionForm = ({ initialData, onSave, onDelete, allCategories, allSour
                 <input className="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-black text-sm uppercase tracking-widest outline-none dark:text-white transition-all shadow-inner" placeholder="Identify transaction stream..." value={formData.desc} onChange={handleDescChange} />
             </div>
 
-            <div className="flex gap-6">
-                <div className={`${formData.category === 'India Transfer' ? 'w-1/3' : 'w-1/2'} space-y-2`}>
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className={`${formData.category === 'India Transfer' ? 'md:w-1/3' : 'md:w-1/2'} w-full space-y-2`}>
                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Magnitude ($)</label>
                     <input type="number" className="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl text-xl font-black outline-none h-[70px] dark:text-white transition-all shadow-inner [color-scheme:light] dark:[color-scheme:dark]" placeholder="0.00" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
                 </div>
                 {formData.category === 'India Transfer' && (
-                    <div className="w-1/3 space-y-2">
+                    <div className="md:w-1/3 w-full space-y-2">
                         <label className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-1 flex items-center gap-2"><Globe size={12}/> Conversion (₹)</label>
                         <input type="number" className="w-full bg-blue-50/50 dark:bg-blue-500/5 border border-blue-100 dark:border-blue-500/20 p-6 rounded-2xl text-xl font-black outline-none h-[70px] text-blue-700 dark:text-blue-400 transition-all placeholder:text-blue-300 shadow-inner" placeholder="₹0" value={formData.secondaryAmount} onChange={e => setFormData({...formData, secondaryAmount: e.target.value})} />
                     </div>
                 )}
-                <div className={`${formData.category === 'India Transfer' ? 'w-1/3' : 'w-1/2'} space-y-2`}>
+                <div className={`${formData.category === 'India Transfer' ? 'md:w-1/3' : 'md:w-1/2'} w-full space-y-2`}>
                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Flow Direction</label>
                     <StyledSelect value={formData.type} onChange={(v) => setFormData({...formData, type: v})} options={[{value: 'expense', label: 'OUTFLOW'}, {value: 'income', label: 'INFLOW'}]} />
                 </div>
             </div>
 
             {/* Source & Tags (Smart Dropdowns) */}
-            <div className="flex gap-6">
-                <div className="w-1/2 space-y-2">
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className="md:w-1/2 w-full space-y-2">
                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Origin Source</label>
                     <CreatableCategorySelect value={formData.source} onChange={(v) => setFormData({...formData, source: v})} options={allSources} placeholder="Assign Source..." />
                 </div>
-                <div className="w-1/2 space-y-2">
+                <div className="md:w-1/2 w-full space-y-2">
                     <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">Metadata Tags</label>
                     <CreatableCategorySelect value={formData.tags[0] || ''} onChange={(v) => setFormData({...formData, tags: [v]})} options={allTags} placeholder="Assign Tags..." />
                 </div>
@@ -4003,35 +4044,34 @@ const IndiaTransferForm = ({ initialData, onSave, onDelete, allRecipients }) => 
     };
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            <div className="flex gap-6">
-                <div className="flex-1 space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Transfer Date</label>
-                    <CustomDatePicker value={formData.date} onChange={date => setFormData({...formData, date})} />
-                </div>
-                <div className="flex-1 flex items-end">
-                    <button 
-                        onClick={() => setFormData(p => ({...p, isExcluded: !p.isExcluded}))}
-                        className={`w-full h-[70px] rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl ${formData.isExcluded ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}
-                    >
-                        {formData.isExcluded ? <><EyeOff size={20}/> Hidden Protocol</> : <><Eye size={20}/> Visible Hub</>}
-                    </button>
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Recipient Identifier</label>
-                <CreatableCategorySelect 
-                    value={formData.recipient} 
-                    onChange={val => setFormData({...formData, recipient: val})} 
-                    options={allRecipients} 
-                    placeholder="Who is receiving the capital? (e.g. Self, Family)"
-                    inputClassName="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-black text-sm uppercase tracking-widest outline-none dark:text-white transition-all shadow-inner"
-                />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
+                <div className="space-y-8 animate-fade-in">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        <div className="flex-1 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Transfer Date</label>
+                            <CustomDatePicker value={formData.date} onChange={date => setFormData({...formData, date})} />
+                        </div>
+                        <div className="flex-1 flex items-end">
+                            <button 
+                                onClick={() => setFormData(p => ({...p, isExcluded: !p.isExcluded}))}
+                                className={`w-full h-[70px] rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 transition-all shadow-xl ${formData.isExcluded ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-600'}`}
+                            >
+                                {formData.isExcluded ? <><EyeOff size={20}/> Hidden Protocol</> : <><Eye size={20}/> Visible Hub</>}
+                            </button>
+                        </div>
+                    </div>
+        
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Recipient Identifier</label>
+                        <CreatableCategorySelect 
+                            value={formData.recipient}
+                            onChange={val => setFormData({...formData, recipient: val})} 
+                            options={allRecipients} 
+                            placeholder="Who is receiving the capital? (e.g. Self, Family)"
+                            inputClassName="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-black text-sm uppercase tracking-widest outline-none dark:text-white transition-all shadow-inner"
+                        />
+                    </div>
+        
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">                <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Capital (USD)</label>
                     <input 
                         type="number" 
