@@ -21,13 +21,13 @@ import {
 
 // --- PASTE YOUR FIREBASE CONFIG OBJECT BELOW ---
 const firebaseConfig = {
-  apiKey: "AIzaSyChTjt1ZCsdU6Oysv0Lesi4KCp7joyHm3Y",
-  authDomain: "tablife-2398c.firebaseapp.com",
-  projectId: "tablife-2398c",
-  storageBucket: "tablife-2398c.firebasestorage.app",
-  messagingSenderId: "1074426677124",
-  appId: "1:1074426677124:web:1679264fce1c5760a13fd1",
-  measurementId: "G-GVX5XQHDL2"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 // ------------------------------------------------
 

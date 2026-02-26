@@ -263,11 +263,7 @@ function App() {
             description,
             changes,
             timestamp: serverTimestamp(),
-            isIndiaCorridor,
-            metadata: {
-                userAgent: navigator.userAgent,
-                platform: navigator.platform
-            }
+            isIndiaCorridor
         });
     } catch (e) { console.error("Logging failed:", e); }
   };
@@ -1415,7 +1411,7 @@ function App() {
                         />
 
                         {/* MAIN DASHBOARD CONTENT */}
-                        <div className="col-span-12 3xl:col-span-6 space-y-10">
+                        <div className="col-span-12 2xl:col-span-12 3xl:col-span-6 4xl:col-span-7 space-y-10">
                             {/* TOP METRIC PILLS - ALIGNED LEFT WITH CONTENT */}
                             <div className="flex flex-wrap gap-6 w-full">
                                 <MetricCapsule label="Revenue Stream" amount={earned} icon={<TrendingUp size={28}/>} color="text-emerald-500 dark:text-emerald-400" bgColor="bg-emerald-50/50 dark:bg-emerald-500/5" borderColor="border-emerald-100 dark:border-emerald-500/20" onClick={() => openDrilldown('type', 'income', statsPrefix, 'Income Details')} />
@@ -1669,7 +1665,7 @@ function App() {
                         </div>
 
                         {/* RIGHT SIDEBAR: CALENDAR & ACTIVITY */}
-                        <div className="col-span-12 3xl:col-span-6 space-y-10">
+                        <div className="col-span-12 3xl:col-span-6 4xl:col-span-5 space-y-10">
                             <div className="sticky top-8 space-y-10">
                                 {/* MINI CALENDAR CARD */}
                                 <div className="bg-white dark:bg-white/[0.03] backdrop-blur-3xl rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-100 dark:border-white/5 group overflow-hidden transition-all duration-700 h-full">
@@ -2342,106 +2338,100 @@ function App() {
                     return (
                         <div className="grid grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
                             {/* HEADER */}
-                            <div className="lg:col-span-12 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-10 mb-2 relative z-[100]">
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
-                                            <Globe size={32} />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">India <br /><span className="text-blue-600 dark:text-blue-500">Corridor.</span></h2>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-4">
-                                        <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-                                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Matrix: {indiaViewMode === 'month' ? `${MONTH_ORDER[indiaViewMonth]} ${indiaSelectedYears[0]}` : (indiaSelectedYears.includes('All Years') ? 'Portfolio Baseline' : indiaSelectedYears.join(' + '))}</span>
-                                        </div>
-                                        <div className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center gap-2 shadow-sm">
-                                            <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Recipient: {indiaViewRecipient}</span>
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1 mt-4">Cross-Border Capital Deployment</p>
-                                    <div className="flex flex-wrap gap-4 mt-8">
-                                        <button onClick={() => setEditTx({isNew: true, category: 'India Transfer', description: 'USD to INR Transfer', type: 'expense', date: new Date().toISOString().split('T')[0], isIndiaCorridor: true, recipient: ''})} className="px-8 py-4 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2"><Plus size={16}/> Manual Entry</button>
-                                        <button onClick={() => { setImportToIndiaHub(true); triggerFileUpload(); }} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shadow-blue-600/20"><UploadCloud size={16}/> Bulk Import</button>
-                                        <button onClick={handleExportIndiaHub} className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shadow-emerald-600/20"><FileInput size={16}/> Export Matrix</button>
-                                        <button onClick={() => setShowIndiaAuditModal(true)} className="px-8 py-4 bg-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shadow-purple-600/20"><History size={16}/> Audit Log</button>
-                                    </div>
-                                </div>
+                            <PageHeader 
+                                icon={<Globe size={32} />}
+                                title={<>India <br /><span className="text-blue-600 dark:text-blue-500">Corridor.</span></>}
+                                subtitle="Cross-Border Capital Deployment"
+                                badges={[
+                                    { 
+                                        label: `Active Matrix: ${indiaViewMode === 'month' ? `${MONTH_ORDER[indiaViewMonth]} ${indiaSelectedYears[0]}` : (indiaSelectedYears.includes('All Years') ? 'Portfolio Baseline' : indiaSelectedYears.join(' + '))}`,
+                                        color: 'bg-blue-600/10 border border-blue-600/20',
+                                        textColor: 'text-blue-600',
+                                        pulse: true
+                                    },
+                                    { label: `Recipient: ${indiaViewRecipient}` }
+                                ]}
+                                actions={[
+                                    { icon: <Plus size={16}/>, label: 'Manual Entry', onClick: () => setEditTx({isNew: true, category: 'India Transfer', description: 'USD to INR Transfer', type: 'expense', date: new Date().toISOString().split('T')[0], isIndiaCorridor: true, recipient: '', mode: 'money'}) },
+                                    { icon: <UploadCloud size={16}/>, label: 'Bulk Import', onClick: () => { setImportToIndiaHub(true); triggerFileUpload(); }, className: 'bg-blue-600 text-white shadow-blue-600/20' },
+                                    { icon: <FileInput size={16}/>, label: 'Export Matrix', onClick: handleExportIndiaHub, className: 'bg-emerald-600 text-white shadow-emerald-600/20' },
+                                    { icon: <History size={16}/>, label: 'Audit Log', onClick: () => setShowIndiaAuditModal(true), className: 'bg-purple-600 text-white shadow-purple-600/20' }
+                                ]}
+                                filters={
+                                    <div className="flex flex-row items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-2 md:pb-0">
+                                        {indiaViewMode === 'month' || !indiaSelectedYears.includes('All Years') ? (
+                                            <button 
+                                                onClick={() => {
+                                                    setIndiaViewMode('year');
+                                                    setIndiaSelectedYears(['All Years']);
+                                                    setIndiaViewRecipient('All Recipients');
+                                                }}
+                                                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all group flex items-center gap-2 shrink-0"
+                                            >
+                                                <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform"/> Reset
+                                            </button>
+                                        ) : null}
 
-                                <div className="flex flex-col md:flex-row items-start md:items-end gap-4 order-1 xl:order-2 w-full md:w-auto">
-                                    {indiaViewMode === 'month' || !indiaSelectedYears.includes('All Years') ? (
-                                        <button 
-                                            onClick={() => {
-                                                setIndiaViewMode('year');
-                                                setIndiaSelectedYears(['All Years']);
-                                                setIndiaViewRecipient('All Recipients');
-                                            }}
-                                            className="px-6 py-3 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5 transition-all mb-1 group flex items-center gap-2 w-full md:w-auto"
-                                        >
-                                            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform"/> Reset Portfolio
-                                        </button>
-                                    ) : null}
+                                        <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                            <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
+                                                <Globe size={16} className="text-blue-600 dark:text-blue-400" />
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
+                                            </div>
+                                            <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
+                                        </div>
 
-                                                                            <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
-                                                                                <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
-                                                                                    <Globe size={16} className="text-blue-600 dark:text-blue-400" />
-                                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
-                                                                                </div>
-                                                                                <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
-                                                                            </div>
-                                    
-                                                                            <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">                                        {indiaViewMode === 'month' ? (
-                                            <>
-                                                <button onClick={() => setIndiaViewMode('year')} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">Monthly</button>
-                                                <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
-                                                <CustomDropdown value={indiaViewMonth} onChange={(m) => { setIndiaViewMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: MONTH_ORDER[i] }))} />
-                                            </>
-                                        ) : (
-                                            <button onClick={() => setIndiaViewMode('month')} className="px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-[0_20px_50px_rgba(37,99,235,0.3)] transition-all hover:scale-105 active:scale-95">Annual Overview</button>
-                                        )}
-                                        <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
-                                        {indiaViewMode === 'month' ? (
-                                            <CustomDropdown 
-                                                value={typeof indiaSelectedYears[0] === 'number' ? indiaSelectedYears[0] : today.getFullYear()} 
-                                                onChange={(y) => { setIndiaSelectedYears([y]); }} 
-                                                options={Array.from({length: 10}, (_, i) => ({ value: today.getFullYear() - 5 + i, label: (today.getFullYear() - 5 + i).toString() }))} 
-                                            />
-                                        ) : (
-                                            <MultiSelectDropdown options={['All Years', ...Array.from({length: 10}, (_, i) => today.getFullYear() - 5 + i)]} selected={indiaSelectedYears} onChange={(years) => { setIndiaSelectedYears(years); }} />
-                                        )}
+                                        <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                            {indiaViewMode === 'month' ? (
+                                                <>
+                                                    <button onClick={() => setIndiaViewMode('year')} className="px-3 md:px-8 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">MM</button>
+                                                    <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-1 md:mx-2"></div>
+                                                    <CustomDropdown value={indiaViewMonth} onChange={(m) => { setIndiaViewMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: MONTH_ORDER[i].substring(0, 3) }))} />
+                                                </>
+                                            ) : (
+                                                <button onClick={() => setIndiaViewMode('month')} className="px-4 md:px-10 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-lg transition-all hover:scale-105 active:scale-95 shrink-0">Annual</button>
+                                            )}
+                                            <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-1 md:mx-2"></div>
+                                            {indiaViewMode === 'month' ? (
+                                                <CustomDropdown 
+                                                    value={typeof indiaSelectedYears[0] === 'number' ? indiaSelectedYears[0] : today.getFullYear()} 
+                                                    onChange={(y) => { setIndiaSelectedYears([y]); }} 
+                                                    options={Array.from({length: 10}, (_, i) => ({ value: today.getFullYear() - 5 + i, label: (today.getFullYear() - 5 + i).toString() }))} 
+                                                />
+                                            ) : (
+                                                <MultiSelectDropdown options={['All Years', ...Array.from({length: 10}, (_, i) => today.getFullYear() - 5 + i)]} selected={indiaSelectedYears} onChange={(years) => { setIndiaSelectedYears(years); }} />
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
+                                }
+                            />
 
                             {/* CONTENT */}
-                            <div className="col-span-12 3xl:col-span-6 space-y-10">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
-                                    <div className="bg-indigo-600 dark:bg-indigo-600 p-4 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
+                            <div className="col-span-12 2xl:col-span-12 3xl:col-span-6 4xl:col-span-7 space-y-10">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10">
+                                    <div className="bg-indigo-600 dark:bg-indigo-600 p-6 md:p-10 rounded-[2.5xl] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10">
-                                            <p className="text-[8px] md:text-[10px] font-black text-indigo-100 uppercase tracking-[0.2em] md:tracking-[0.4em] mb-2 md:mb-4 truncate">Capital Deployed (USD)</p>
-                                            <p className="text-2xl md:text-5xl font-black text-white tracking-tighter truncate">${totalUSD.toLocaleString()}</p>
+                                            <p className="text-[9px] md:text-[10px] font-black text-indigo-100 uppercase tracking-[0.3em] md:tracking-[0.4em] mb-2 md:mb-4">Capital Deployed (USD)</p>
+                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter whitespace-nowrap leading-none">${totalUSD.toLocaleString()}</p>
                                         </div>
                                         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
                                         <div className="absolute top-0 right-0 p-8 opacity-20 hidden md:block"><TrendingUp size={48} className="text-white" /></div>
                                     </div>
 
-                                    <div className="bg-emerald-600 dark:bg-emerald-600 p-4 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(16,185,129,0.3)] relative overflow-hidden group border border-emerald-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
+                                    <div className="bg-emerald-600 dark:bg-emerald-600 p-6 md:p-10 rounded-[2.5xl] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(16,185,129,0.3)] relative overflow-hidden group border border-emerald-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10">
-                                            <p className="text-[8px] md:text-[10px] font-black text-emerald-100 uppercase tracking-[0.2em] md:tracking-[0.4em] mb-2 md:mb-4 truncate">Received Value (INR)</p>
-                                            <p className="text-2xl md:text-5xl font-black text-white tracking-tighter truncate">{formatINR(totalINR)}</p>
-                                            <div className="mt-2 md:mt-4 text-emerald-100/60 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] truncate">₹{totalINR.toLocaleString('en-IN')}</div>
+                                            <p className="text-[9px] md:text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] md:tracking-[0.4em] mb-2 md:mb-4">Received Value (INR)</p>
+                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter whitespace-nowrap leading-none">{formatINR(totalINR)}</p>
+                                            <div className="mt-2 md:mt-4 text-emerald-100/60 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">₹{totalINR.toLocaleString('en-IN')}</div>
                                         </div>
                                         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
                                         <div className="absolute top-0 right-0 p-8 opacity-20 hidden md:block"><CreditCard size={48} className="text-white" /></div>
                                     </div>
 
-                                    <div className="bg-slate-900 dark:bg-white/5 backdrop-blur-3xl p-4 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-lg md:shadow-2xl relative overflow-hidden group border border-slate-800 dark:border-white/10 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
+                                    <div className="bg-slate-900 dark:bg-white/5 backdrop-blur-3xl p-6 md:p-10 rounded-[2.5xl] md:rounded-[3rem] shadow-lg md:shadow-2xl relative overflow-hidden group border border-slate-800 dark:border-white/10 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10 flex flex-col justify-center h-full">
-                                            <p className="text-[8px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] md:tracking-[0.4em] mb-2 md:mb-4 truncate">Avg Efficiency</p>
-                                            <p className="text-2xl md:text-5xl font-black text-white tracking-tighter truncate">₹{avgRate.toFixed(2)}</p>
-                                            <div className="mt-2 md:mt-4 text-slate-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest truncate">{activeTxs.length} Strategic Transfers</div>
+                                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.3em] md:tracking-[0.4em] mb-2 md:mb-4">Avg Efficiency</p>
+                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter whitespace-nowrap leading-none">₹{avgRate.toFixed(2)}</p>
+                                            <div className="mt-2 md:mt-4 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest truncate">{activeTxs.length} Strategic Transfers</div>
                                         </div>
                                         <div className="absolute top-0 right-0 p-8 opacity-10 hidden md:block"><Zap size={48} className="text-white" /></div>
                                     </div>
@@ -2530,7 +2520,7 @@ function App() {
                                 </div>
                             </div>
 
-                            <div className="col-span-12 3xl:col-span-6 space-y-10">
+                            <div className="col-span-12 2xl:col-span-12 3xl:col-span-6 4xl:col-span-5 space-y-10">
                                 <div className="sticky top-8 space-y-6">
                                     <div className="flex justify-between items-center px-4">
                                         <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Transfer Ledger</h3>
@@ -2538,7 +2528,7 @@ function App() {
                                     </div>
                                     <div className="bg-white dark:bg-white/[0.02] backdrop-blur-3xl rounded-[3rem] shadow-xl border border-gray-100 dark:border-white/5 overflow-hidden max-h-[85vh] overflow-y-auto custom-scrollbar">
                                         {activeTxs.map(tx => (
-                                            <TransactionRow key={tx.firestoreId} tx={tx} onClick={() => setEditTx(tx)} onFilterClick={(type, val) => {}} isGlobalExcluded={false} categoryIcons={categoryIcons} isSelected={selectedTxIds.includes(tx.firestoreId)} onSelect={() => toggleSelectTx(tx.firestoreId)} />
+                                            <TransactionRow key={tx.firestoreId} tx={tx} onClick={() => setEditTx(tx)} onFilterClick={() => {}} isGlobalExcluded={false} categoryIcons={categoryIcons} isSelected={selectedTxIds.includes(tx.firestoreId)} onSelect={() => toggleSelectTx(tx.firestoreId)} />
                                         ))}
                                         {activeTxs.length === 0 && (
                                             <div className="p-20 text-center">
@@ -4341,34 +4331,37 @@ const SidebarItem = ({ icon, label, active, onClick }) => (
 );
 
 const PageHeader = ({ icon, title, subtitle, badges = [], actions = [], filters = null }) => (
-    <div className="col-span-12 flex flex-col 3xl:flex-row justify-between items-start 3xl:items-end gap-10 mb-2 relative z-[100] w-full">
-        <div className="space-y-4">
+    <div className="col-span-12 flex flex-col 3xl:flex-row justify-between items-start 3xl:items-end gap-6 md:gap-10 mb-2 relative z-[100] w-full px-1">
+        <div className="space-y-4 w-full">
             <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-600 rounded-2xl md:rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-600/20 shrink-0">
                     {icon}
                 </div>
                 <div>
-                    <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">{title}</h2>
+                    <h2 className="text-4xl md:text-7xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">{title}</h2>
                 </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 mt-4">
+            <div className="flex flex-nowrap items-center gap-2 mt-2 md:mt-4 overflow-x-auto no-scrollbar pb-1">
                 {badges.map((badge, i) => (
-                    <div key={i} className={`px-4 py-1.5 rounded-full ${badge.color || 'bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10'} flex items-center gap-2 shadow-sm`}>
-                        {badge.pulse && <div className={`w-1.5 h-1.5 rounded-full ${badge.pulseColor || 'bg-blue-600'} animate-pulse`}></div>}
+                    <div key={i} className={`px-3 md:px-4 py-1 md:py-1.5 rounded-full ${badge.color || 'bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10'} flex items-center gap-2 shadow-sm shrink-0`}>
+                        {badge.pulse && <div className={`w-1 h-1 md:w-1.5 md:h-1.5 rounded-full ${badge.pulseColor || 'bg-blue-600'} animate-pulse`}></div>}
                         <span className={`text-[10px] font-black uppercase tracking-widest ${badge.textColor || 'text-gray-500 dark:text-gray-400'}`}>{badge.label}</span>
                     </div>
                 ))}
             </div>
-            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1 mt-4">{subtitle}</p>
-            <div className="flex flex-wrap gap-4 mt-8">
-                {actions.map((action, i) => (
-                    <button key={i} onClick={action.onClick} className={`px-8 py-4 ${action.className || 'bg-gray-900 dark:bg-white text-white dark:text-black'} rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2`}>
-                        {action.icon} {action.label}
-                    </button>
-                ))}
-            </div>
+            <p className="text-xs md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] md:tracking-[0.4em] ml-1 mt-2 md:mt-4">{subtitle}</p>
+            
+            {actions.length > 0 && (
+                <div className="bg-gray-100/50 dark:bg-white/5 p-2 md:p-0 md:bg-transparent md:dark:bg-transparent rounded-3xl border border-gray-200/50 dark:border-white/5 md:border-0 flex flex-row items-center gap-2 md:gap-4 mt-4 md:mt-8 overflow-x-auto no-scrollbar shadow-inner md:shadow-none">
+                    {actions.map((action, i) => (
+                        <button key={i} onClick={action.onClick} className={`px-5 md:px-8 py-3.5 md:py-4 ${action.className || 'bg-gray-900 dark:bg-white text-white dark:text-black'} rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2 shrink-0`}>
+                            {action.icon} <span>{action.label}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
-        <div className="flex flex-row items-center gap-2 order-1 xl:order-2 w-full md:w-auto overflow-visible pb-2 md:pb-0">
+        <div className="flex flex-row items-center gap-2 order-1 3xl:order-2 w-full 3xl:w-auto overflow-visible pb-2 md:pb-0">
             {filters}
         </div>
     </div>
