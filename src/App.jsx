@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { db, auth, provider, signInWithPopup, signOut, collection, addDoc, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, getDoc, setDoc, writeBatch, where, getDocs, serverTimestamp } from './firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { 
@@ -284,7 +284,9 @@ function App() {
       type: formData.type, mode: formData.mode, category: finalCat,
       source: formData.source || '', tags: finalTags, 
       isExcluded: formData.isExcluded,
-      isIndiaCorridor: formData.isIndiaCorridor || false
+      isIndiaCorridor: formData.isIndiaCorridor || false,
+      recipient: formData.recipient || '',
+      rate: formData.rate || ''
     };
     try {
       if (formData.id) {
@@ -299,7 +301,7 @@ function App() {
           logActivity('ADD', docRef.id, txData.description, { after: txData }, txData.isIndiaCorridor);
       }
       setEditTx(null);
-      if (!formData.id) setActiveTab('dashboard'); 
+      if (!formData.id && !txData.isIndiaCorridor) setActiveTab('dashboard'); 
     } catch (e) { alert(e.message); }
   };
 
@@ -923,10 +925,11 @@ function App() {
   };
 
   // --- DROPDOWNS ---
-  const { allCategories, allSources, allTags } = useMemo(() => {
+  const { allCategories, allSources, allTags, allRecipients } = useMemo(() => {
     const cats = new Set(DEFAULT_CATEGORIES);
     const sources = new Set(['Cash', 'Credit Card']);
     const tags = new Set(['Trip', 'Business']);
+    const recipients = new Set();
     transactions.forEach(t => {
         if(t.category) {
             const catStr = String(t.category);
@@ -936,11 +939,13 @@ function App() {
         }
         if(t.source) sources.add(String(t.source));
         if(Array.isArray(t.tags)) t.tags.forEach(tag => tag && tag.trim() && tags.add(tag));
+        if(t.recipient) recipients.add(String(t.recipient));
     });
     return { 
         allCategories: Array.from(cats).sort(),
         allSources: Array.from(sources).sort(),
-        allTags: Array.from(tags).sort()
+        allTags: Array.from(tags).sort(),
+        allRecipients: Array.from(recipients).sort()
     };
   }, [transactions]);
 
@@ -2130,59 +2135,151 @@ function App() {
                         const wb = XLSX.utils.book_new();
                         const rows = [];
                         
-                        // Professional Header Section
-                        rows.push(['INDIA CORRIDOR - CAPITAL DEPLOYMENT MATRIX']);
-                        rows.push([`Generated: ${new Date().toLocaleString()}`]);
-                        rows.push(['Recipient:', indiaViewRecipient]);
+                        // --- DESIGN SYSTEM: PREMIUM EXECUTIVE PALETTE ---
+                        const COLORS = {
+                            NAVY: "0F172A",
+                            BLUE: "2563EB",
+                            EMERALD: "059669",
+                            AMBER: "D97706",
+                            SLATE_600: "475569",
+                            SLATE_100: "F1F5F9",
+                            WHITE: "FFFFFF"
+                        };
+
+                        const STYLES = {
+                            MAIN_TITLE: { font: { bold: true, sz: 22, color: { rgb: COLORS.WHITE } }, fill: { fgColor: { rgb: COLORS.NAVY } }, alignment: { horizontal: "center", vertical: "center" } },
+                            SUB_TITLE: { font: { sz: 9, italic: true, color: { rgb: "94A3B8" } }, fill: { fgColor: { rgb: COLORS.NAVY } }, alignment: { horizontal: "center" } },
+                            
+                            // KPI POWER BLOCKS (2-Column Merged)
+                            KPI_L_USD: { font: { bold: true, sz: 10, color: { rgb: COLORS.WHITE } }, fill: { fgColor: { rgb: COLORS.BLUE } }, alignment: { horizontal: "center" } },
+                            KPI_V_USD: { font: { bold: true, sz: 22, color: { rgb: COLORS.BLUE } }, fill: { fgColor: { rgb: COLORS.WHITE } }, alignment: { horizontal: "center" }, border: { bottom: { style: "thick", color: { rgb: COLORS.BLUE } } } },
+                            
+                            KPI_L_INR: { font: { bold: true, sz: 10, color: { rgb: COLORS.WHITE } }, fill: { fgColor: { rgb: COLORS.EMERALD } }, alignment: { horizontal: "center" } },
+                            KPI_V_INR: { font: { bold: true, sz: 22, color: { rgb: COLORS.EMERALD } }, fill: { fgColor: { rgb: COLORS.WHITE } }, alignment: { horizontal: "center" }, border: { bottom: { style: "thick", color: { rgb: COLORS.EMERALD } } } },
+                            
+                            KPI_L_RATE: { font: { bold: true, sz: 10, color: { rgb: COLORS.WHITE } }, fill: { fgColor: { rgb: COLORS.AMBER } }, alignment: { horizontal: "center" } },
+                            KPI_V_RATE: { font: { bold: true, sz: 22, color: { rgb: COLORS.AMBER } }, fill: { fgColor: { rgb: COLORS.WHITE } }, alignment: { horizontal: "center" }, border: { bottom: { style: "thick", color: { rgb: COLORS.AMBER } } } },
+
+                            SECTION_HEADER: { font: { bold: true, sz: 11, color: { rgb: COLORS.WHITE } }, fill: { fgColor: { rgb: COLORS.SLATE_600 } }, alignment: { vertical: "center" } },
+                            TABLE_HEADER: { font: { bold: true, color: { rgb: COLORS.WHITE } }, fill: { fgColor: { rgb: COLORS.NAVY } }, border: { bottom: { style: "medium", color: { rgb: COLORS.BLUE } } } },
+                            
+                            YEAR_BAR: { font: { bold: true, sz: 12, color: { rgb: COLORS.BLUE } }, fill: { fgColor: { rgb: COLORS.SLATE_100 } }, border: { bottom: { style: "thin", color: { rgb: COLORS.BLUE } } } },
+                            ROW_TOTAL: { font: { bold: true, sz: 10 }, fill: { fgColor: { rgb: "E2E8F0" } } },
+                            ZEBRA: { fill: { fgColor: { rgb: "F8FAFC" } } }
+                        };
+
+                        const INDIAN_NUM_FMT = "[$₹-409] #,##,##0"; // Standard LCID for Hindi (India) to force Lakhs/Crores grouping
+                        const addCell = (val, style = {}, type = 's') => ({ v: val, s: style, t: type });
+
+                        // 1. BRANDED HEADER
+                        rows.push([addCell("INDIA STRATEGIC CORRIDOR: PERFORMANCE AUDIT", STYLES.MAIN_TITLE), "", "", "", "", ""]);
+                        rows.push([addCell(`EXECUTIVE SUMMARY | GENERATED: ${new Date().toLocaleString().toUpperCase()}`, STYLES.SUB_TITLE), "", "", "", "", ""]);
                         rows.push([]);
 
-                        // Global Totals Summary
-                        rows.push(['PORTFOLIO SUMMARY']);
-                        rows.push(['Total USD Deployed', totalUSD]);
-                        rows.push(['Total INR Received', totalINR]);
-                        rows.push(['Average Exchange Rate', avgRate.toFixed(2)]);
+                        // 2. THE KPI DASHBOARD (3 Massive Blocks)
+                        rows.push([
+                            addCell("TOTAL DEPLOYED (USD)", STYLES.KPI_L_USD), "", 
+                            addCell("TOTAL RECEIVED (INR)", STYLES.KPI_L_INR), "",
+                            addCell("AVG RATE & VOLUME", STYLES.KPI_L_RATE), ""
+                        ]);
+                        rows.push([
+                            addCell(totalUSD, { ...STYLES.KPI_V_USD, numFmt: "$#,##0" }, 'n'), "", 
+                            addCell(totalINR, { ...STYLES.KPI_V_INR, numFmt: INDIAN_NUM_FMT }, 'n'), "",
+                            addCell(`${avgRate.toFixed(2)} [${activeTxs.length} TXs]`, STYLES.KPI_V_RATE), ""
+                        ]);
                         rows.push([]);
-                        rows.push(['DETAILED TRANSACTION LEDGER']);
-                        rows.push(['Date', 'Recipient', 'USD Amount', 'Ex. Rate', 'INR Received', 'Source', 'Notes', 'Status']);
 
-                        // Group by Year for stylized grouping
+                        // 3. PARAMETERS & LEDGER
+                        rows.push([addCell("DETAILED TRANSACTION LEDGER", STYLES.SECTION_HEADER), "", "", "", "", ""]);
+                        const ledgerHeaderIdx = rows.length;
+                        rows.push([
+                            addCell("DATE", STYLES.TABLE_HEADER),
+                            addCell("RECIPIENT", STYLES.TABLE_HEADER),
+                            addCell("USD SENT ($)", STYLES.TABLE_HEADER),
+                            addCell("INR RECV (₹)", STYLES.TABLE_HEADER),
+                            addCell("EX. RATE (₹/$)", STYLES.TABLE_HEADER),
+                            addCell("CONTEXT / AUDIT NOTES", STYLES.TABLE_HEADER)
+                        ]);
+
+                        // 4. GROUPED DATA (Collapsed Logic)
                         const years = [...new Set(activeTxs.map(t => t.date.substring(0, 4)))].sort((a, b) => b - a);
-                        
+                        const rowMetaData = []; // To track levels and hidden states
+
+                        // Initial rows are all visible and level 0
+                        for(let i=0; i < rows.length; i++) rowMetaData.push({ level: 0, hidden: false });
+
                         years.forEach(yr => {
                             const yrTxs = activeTxs.filter(t => t.date.startsWith(yr));
                             const yrUsd = yrTxs.reduce((s, t) => s + Number(t.amount), 0);
                             const yrInr = yrTxs.reduce((s, t) => s + Number(t.secondaryAmount || 0), 0);
+                            const yrRate = yrUsd > 0 ? (yrInr / yrUsd) : 0;
                             
-                            // Year Header
-                            rows.push([`--- YEAR: ${yr} ---`]);
+                            // Year Bar (Visible at Level 0 - Contains Aggregate Data)
+                            rows.push([
+                                addCell(`FY ${yr} ARCHIVE`, STYLES.YEAR_BAR),
+                                addCell(`${yrTxs.length} Strategic Entries`, STYLES.YEAR_BAR),
+                                addCell(yrUsd, { ...STYLES.YEAR_BAR, numFmt: "$#,##0", alignment: { horizontal: "right" } }, 'n'),
+                                addCell(yrInr, { ...STYLES.YEAR_BAR, numFmt: INDIAN_NUM_FMT, alignment: { horizontal: "right" } }, 'n'),
+                                addCell(Number(yrRate.toFixed(2)), { ...STYLES.YEAR_BAR, numFmt: "0.00", alignment: { horizontal: "right" } }, 'n'),
+                                addCell("AUDITED CONSOLIDATION", STYLES.YEAR_BAR)
+                            ]);
+                            rowMetaData.push({ level: 0, hidden: false });
                             
-                            yrTxs.forEach(t => {
+                            yrTxs.forEach((t, idx) => {
+                                const isZebra = idx % 2 === 0;
+                                const rowStyle = isZebra ? STYLES.ZEBRA : {};
+                                
                                 rows.push([
-                                    t.date,
-                                    t.recipient || 'N/A',
-                                    Number(t.amount),
-                                    Number(t.rate || (t.amount > 0 ? (Number(t.secondaryAmount) / Number(t.amount)).toFixed(2) : 0)),
-                                    Number(t.secondaryAmount),
-                                    t.source,
-                                    t.notes || '',
-                                    t.isExcluded ? 'Hidden' : 'Visible'
+                                    addCell(t.date, rowStyle),
+                                    addCell(t.recipient || 'N/A', rowStyle),
+                                    addCell(Number(t.amount), { ...rowStyle, numFmt: "$#,##0" }, 'n'),
+                                    addCell(Number(t.secondaryAmount), { ...rowStyle, numFmt: INDIAN_NUM_FMT }, 'n'),
+                                    addCell(Number(t.rate || (t.amount > 0 ? (Number(t.secondaryAmount) / Number(t.amount)).toFixed(2) : 0)), { ...rowStyle, numFmt: "0.00" }, 'n'),
+                                    addCell(t.notes || '---', { ...rowStyle, alignment: { wrapText: true } })
                                 ]);
+                                // Transaction rows are level 1 and hidden by default
+                                rowMetaData.push({ level: 1, hidden: true });
                             });
                             
-                            // Year Summary Row
-                            rows.push(['', `TOTAL FOR ${yr}`, yrUsd, (yrInr/yrUsd).toFixed(2), yrInr, '', '', '']);
                             rows.push([]); // Spacer
+                            rowMetaData.push({ level: 0, hidden: false });
                         });
 
                         const ws = XLSX.utils.aoa_to_sheet(rows);
                         
-                        // Basic Column Widths
-                        ws['!cols'] = [
-                            {wch: 15}, {wch: 20}, {wch: 15}, {wch: 12}, {wch: 18}, {wch: 15}, {wch: 30}, {wch: 10}
+                        // --- SIZING & GROUPING ---
+                        ws['!cols'] = [{wch: 12}, {wch: 22}, {wch: 16}, {wch: 18}, {wch: 12}, {wch: 45}];
+                        ws['!rows'] = rowMetaData.map((meta, i) => {
+                            let height = 20;
+                            if (i === 0) height = 50;
+                            if (i === 4) height = 40;
+                            return { hpt: height, level: meta.level, hidden: meta.hidden };
+                        });
+
+                        // --- INTERACTIVE FEATURES & MERGES ---
+                        ws['!autofilter'] = { ref: `A${ledgerHeaderIdx + 1}:F${rows.length}` };
+                        
+                        ws['!merges'] = [
+                            { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }, // Title
+                            { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }, // Subtitle
+                            { s: { r: 3, c: 0 }, e: { r: 3, c: 1 } }, // KPI 1 Label
+                            { s: { r: 4, c: 0 }, e: { r: 4, c: 1 } }, // KPI 1 Value
+                            { s: { r: 3, c: 2 }, e: { r: 3, c: 3 } }, // KPI 2 Label
+                            { s: { r: 4, c: 2 }, e: { r: 4, c: 3 } }, // KPI 2 Value
+                            { s: { r: 3, c: 4 }, e: { r: 3, c: 5 } }, // KPI 3 Label
+                            { s: { r: 4, c: 4 }, e: { r: 4, c: 5 } }, // KPI 3 Value
+                            { s: { r: 6, c: 0 }, e: { r: 6, c: 5 } }  // Header
                         ];
 
-                        XLSX.utils.book_append_sheet(wb, ws, "India Transfers");
-                        XLSX.writeFile(wb, `India_Transfer_Matrix_${new Date().getFullYear()}.xlsx`);
+                        // Merge Year Bars
+                        rows.forEach((row, idx) => {
+                            if (row[0] && row[0].v && String(row[0].v).startsWith('FISCAL YEAR')) {
+                                ws['!merges'].push({ s: { r: idx, c: 0 }, e: { r: idx, c: 5 } });
+                            }
+                        });
+
+                        XLSX.utils.book_append_sheet(wb, ws, "India Strategic Report");
+                        XLSX.writeFile(wb, `India_Strategic_Ledger_${new Date().getFullYear()}.xlsx`);
                     };
 
                     const handleIndiaBarClick = (data) => {
@@ -2327,13 +2424,13 @@ function App() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={indiaGraphData}>
                                                 <defs>
-                                                    <linearGradient id="colorIndiaUsd" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/><stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                                                    <linearGradient id="colorIndiaInr" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "rgba(255,255,255,0.03)" : "#f1f5f9"} />
                                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} dy={15} />
-                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} tickFormatter={(val) => formatINR(val).replace('₹', '')} />
                                                 <Tooltip cursor={{ fill: darkMode ? 'rgba(255,255,255,0.03)' : '#f8fafc', radius: 16 }} content={({ active, payload, label }) => {
                                                     if (active && payload && payload.length) {
                                                         const d = payload[0].payload;
@@ -2341,16 +2438,16 @@ function App() {
                                                             <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/10 min-w-[240px] z-[9999]">
                                                                 <p className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest border-b dark:border-white/5 pb-3">{label} Transfers</p>
                                                                 <div className="space-y-3">
-                                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">USD Sent</span><span className="text-xl font-black dark:text-white">${d.usd.toLocaleString()}</span></div>
-                                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">INR Recv.</span><span className="text-lg font-black dark:text-gray-300">{formatINR(d.inr)}</span></div>
+                                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">INR Recv.</span><span className="text-xl font-black dark:text-white">{formatINR(d.inr)}</span></div>
+                                                                    <div className="flex justify-between items-center"><span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">USD Sent</span><span className="text-lg font-black dark:text-gray-300">${d.usd.toLocaleString()}</span></div>
                                                                 </div>
                                                             </div>
                                                         );
                                                     }
                                                     return null;
                                                 }} />
-                                                <Bar dataKey="usd" fill="url(#colorIndiaUsd)" radius={[12, 12, 12, 12]} barSize={32} onClick={handleIndiaBarClick} cursor="pointer">
-                                                    {indiaGraphData.map((entry, index) => (<Cell key={`cell-${index}`} fill="url(#colorIndiaUsd)" opacity={entry.fullDate === statsPrefix ? 1 : 0.6} stroke={entry.fullDate === statsPrefix ? "#2563eb" : "none"} strokeWidth={entry.fullDate === statsPrefix ? 2 : 0} />))}
+                                                <Bar dataKey="inr" fill="url(#colorIndiaInr)" radius={[12, 12, 12, 12]} barSize={32} onClick={handleIndiaBarClick} cursor="pointer">
+                                                    {indiaGraphData.map((entry, index) => (<Cell key={`cell-${index}`} fill="url(#colorIndiaInr)" opacity={entry.fullDate === statsPrefix ? 1 : 0.6} stroke={entry.fullDate === statsPrefix ? "#10b981" : "none"} strokeWidth={entry.fullDate === statsPrefix ? 2 : 0} />))}
                                                 </Bar>
                                             </ComposedChart>
                                         </ResponsiveContainer>
@@ -2366,13 +2463,13 @@ function App() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={cumGraphData}>
                                                 <defs>
-                                                    <linearGradient id="colorIndiaCumUsd" x1="0" y1="0" x2="0" y2="1">
+                                                    <linearGradient id="colorIndiaCumInr" x1="0" y1="0" x2="0" y2="1">
                                                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "rgba(255,255,255,0.03)" : "#f1f5f9"} />
                                                 <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} dy={15} />
-                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 900}} tickFormatter={(val) => formatINR(val).replace('₹', '')} />
                                                 <Tooltip content={({ active, payload, label }) => {
                                                     if (active && payload && payload.length) {
                                                         const d = payload[0].payload;
@@ -2380,15 +2477,15 @@ function App() {
                                                             <div className="bg-white dark:bg-[#0a0a0a] p-6 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-white/10 min-w-[200px] z-[9999]">
                                                                 <p className="font-black text-gray-900 dark:text-white mb-6 text-[10px] uppercase tracking-widest border-b dark:border-white/5 pb-2">End of {label}</p>
                                                                 <div className="space-y-3 pt-2">
-                                                                    <div className="flex justify-between items-center"><span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Total USD</span><span className="font-black text-xl text-emerald-500 dark:text-emerald-400 ml-4">${d.totalUsd.toLocaleString()}</span></div>
-                                                                    <div className="flex justify-between items-center"><span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Total INR</span><span className="font-black text-lg text-blue-500 dark:text-blue-400 ml-4">{formatINR(d.totalInr)}</span></div>
+                                                                    <div className="flex justify-between items-center"><span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Total INR</span><span className="font-black text-xl text-emerald-500 dark:text-emerald-400 ml-4">{formatINR(d.totalInr)}</span></div>
+                                                                    <div className="flex justify-between items-center"><span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Total USD</span><span className="font-black text-lg text-blue-500 dark:text-blue-400 ml-4">${d.totalUsd.toLocaleString()}</span></div>
                                                                 </div>
                                                             </div>
                                                         );
                                                     }
                                                     return null;
                                                 }} />
-                                                <Area type="monotone" dataKey="totalUsd" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorIndiaCumUsd)" />
+                                                <Area type="monotone" dataKey="totalInr" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorIndiaCumInr)" />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -2507,6 +2604,7 @@ function App() {
                         initialData={editTx.isNew ? {isIndiaCorridor: true, category: 'India Transfer', ...editTx} : editTx}
                         onSave={handleSave}
                         onDelete={!editTx.isNew ? () => setDeleteConfirm({ type: 'single', id: editTx.firestoreId }) : null}
+                        allRecipients={allRecipients}
                     />
                 ) : (
                     <TransactionForm 
@@ -2534,11 +2632,11 @@ function App() {
                                     <Globe size={20} className="text-blue-600 dark:text-blue-400" />
                                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-800 dark:text-blue-300">Default Recipient:</span>
                                     <div className="w-64">
-                                        <input 
-                                            className="w-full bg-white dark:bg-[#0a0a0a] p-3 rounded-xl font-black text-[10px] uppercase tracking-widest outline-none border border-transparent focus:border-blue-500/30 dark:text-white"
+                                        <CreatableCategorySelect 
+                                            value={importPreview[0]?.recipient || ''}
+                                            options={allRecipients}
                                             placeholder="Assign to (e.g. Family)"
-                                            onChange={(e) => {
-                                                const val = e.target.value;
+                                            onChange={(val) => {
                                                 const next = importPreview.map(tx => ({ ...tx, recipient: val }));
                                                 setImportPreview(next);
                                             }}
@@ -3459,10 +3557,12 @@ const TransactionRow = ({ tx, onClick, onFilterClick, isGlobalExcluded, category
                 </div>
                 <div className="space-y-1.5">
                     <div className="flex items-center gap-3">
-                        <p className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-tight">{tx.description}</p>
+                        <p className="font-black text-gray-900 dark:text-white text-sm uppercase tracking-tight">
+                            {tx.isIndiaCorridor && tx.recipient ? tx.recipient : tx.description}
+                        </p>
                         {tx.isIndiaCorridor && tx.recipient && (
-                            <span className="text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-lg font-black uppercase tracking-widest flex items-center gap-1.5 shadow-lg shadow-blue-500/20">
-                                <Globe size={10}/> {tx.recipient}
+                            <span className="text-[9px] bg-blue-600/10 text-blue-600 px-2 py-0.5 rounded-lg font-black uppercase tracking-widest flex items-center gap-1.5 border border-blue-600/20">
+                                <Globe size={10}/> India Corridor
                             </span>
                         )}
                         {tx.source && tx.source !== 'Cash' && !tx.isIndiaCorridor && 
@@ -3557,7 +3657,7 @@ const Popup = ({ title, onClose, children, wide, size = 'md', headerAction, zInd
         </div>
     );
 };
-const CreatableCategorySelect = ({ value, onChange, options, placeholder }) => {
+const CreatableCategorySelect = ({ value, onChange, options, placeholder, inputClassName }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [localValue, setLocalValue] = useState(null);
     const ref = useRef(null);
@@ -3590,7 +3690,7 @@ const CreatableCategorySelect = ({ value, onChange, options, placeholder }) => {
             <div className="relative group">
                 <input 
                     type="text"
-                    className="w-full bg-gray-50 dark:bg-white/[0.03] p-4 pr-10 rounded-xl font-black text-[10px] uppercase tracking-widest border border-transparent focus:bg-white dark:focus:bg-[#0a0a0a] focus:border-blue-500/30 outline-none transition-all dark:text-white shadow-inner"
+                    className={inputClassName || "w-full bg-gray-50 dark:bg-white/[0.03] p-4 pr-10 rounded-xl font-black text-[10px] uppercase tracking-widest border border-transparent focus:bg-white dark:focus:bg-[#0a0a0a] focus:border-blue-500/30 outline-none transition-all dark:text-white shadow-inner"}
                     value={inputValue}
                     onChange={handleChange}
                     onFocus={() => setIsOpen(true)}
@@ -3840,7 +3940,7 @@ const TransactionForm = ({ initialData, onSave, onDelete, allCategories, allSour
     );
 };
 
-const IndiaTransferForm = ({ initialData, onSave, onDelete }) => {
+const IndiaTransferForm = ({ initialData, onSave, onDelete, allRecipients }) => {
     const [formData, setFormData] = useState({
         id: initialData.firestoreId || null,
         date: initialData.date || new Date().toISOString().split('T')[0],
@@ -3853,26 +3953,53 @@ const IndiaTransferForm = ({ initialData, onSave, onDelete }) => {
         isExcluded: initialData.isExcluded || false,
         isIndiaCorridor: true,
         type: 'expense',
+        mode: 'money',
         category: 'India Transfer'
     });
 
-    const calculateInr = (usd, rate) => {
-        if (usd && rate) return (parseFloat(usd) * parseFloat(rate)).toFixed(2);
-        return formData.secondaryAmount;
-    };
-
     const handleUsdChange = (val) => {
-        const inr = calculateInr(val, formData.rate);
-        setFormData(prev => ({ ...prev, amount: val, secondaryAmount: inr }));
+        setFormData(prev => {
+            const next = { ...prev, amount: val };
+            const v = parseFloat(val);
+            const r = parseFloat(prev.rate);
+            const i = parseFloat(prev.secondaryAmount);
+            if (!isNaN(v) && !isNaN(r)) {
+                next.secondaryAmount = (v * r).toFixed(2);
+            } else if (!isNaN(v) && !isNaN(i) && v !== 0) {
+                next.rate = (i / v).toFixed(2);
+            }
+            return next;
+        });
     };
 
     const handleRateChange = (val) => {
-        const inr = calculateInr(formData.amount, val);
-        setFormData(prev => ({ ...prev, rate: val, secondaryAmount: inr }));
+        setFormData(prev => {
+            const next = { ...prev, rate: val };
+            const r = parseFloat(val);
+            const v = parseFloat(prev.amount);
+            const i = parseFloat(prev.secondaryAmount);
+            if (!isNaN(r) && !isNaN(v)) {
+                next.secondaryAmount = (v * r).toFixed(2);
+            } else if (!isNaN(r) && !isNaN(i) && r !== 0) {
+                next.amount = (i / r).toFixed(2);
+            }
+            return next;
+        });
     };
 
     const handleInrChange = (val) => {
-        setFormData(prev => ({ ...prev, secondaryAmount: val }));
+        setFormData(prev => {
+            const next = { ...prev, secondaryAmount: val };
+            const i = parseFloat(val);
+            const v = parseFloat(prev.amount);
+            const r = parseFloat(prev.rate);
+            if (!isNaN(i) && !isNaN(v) && v !== 0) {
+                next.rate = (i / v).toFixed(2);
+            } else if (!isNaN(i) && !isNaN(r) && r !== 0) {
+                next.amount = (i / r).toFixed(2);
+            }
+            return next;
+        });
     };
 
     return (
@@ -3894,11 +4021,12 @@ const IndiaTransferForm = ({ initialData, onSave, onDelete }) => {
 
             <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Recipient Identifier</label>
-                <input 
-                    className="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-black text-sm uppercase tracking-widest outline-none dark:text-white transition-all shadow-inner" 
-                    placeholder="Who is receiving the capital? (e.g. Self, Family)" 
+                <CreatableCategorySelect 
                     value={formData.recipient} 
-                    onChange={e => setFormData({...formData, recipient: e.target.value})} 
+                    onChange={val => setFormData({...formData, recipient: val})} 
+                    options={allRecipients} 
+                    placeholder="Who is receiving the capital? (e.g. Self, Family)"
+                    inputClassName="w-full bg-gray-50 dark:bg-white/[0.03] border border-transparent focus:border-blue-500/30 focus:bg-white dark:focus:bg-[#0a0a0a] p-6 rounded-2xl font-black text-sm uppercase tracking-widest outline-none dark:text-white transition-all shadow-inner"
                 />
             </div>
 
