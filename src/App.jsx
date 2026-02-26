@@ -1352,72 +1352,70 @@ function App() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-white dark:bg-transparent transition-colors custom-scrollbar">
-            <div className="max-w-[1920px] mx-auto space-y-12">
+            <div className="max-w-full 4xl:max-w-[2560px] mx-auto space-y-12">
                 {activeTab === 'dashboard' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
-                        {/* MAIN DASHBOARD HEADER - HIGH LEVEL CONTEXT */}
-                        <div className="lg:col-span-12 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-10 mb-2 relative z-[100]">
-                            <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <h2 className="text-4xl md:text-7xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">Strategic <br /><span className="text-blue-600 dark:text-blue-500 animate-pulse">Wealth.</span></h2>
-                                    <div className="flex flex-wrap items-center gap-3 mt-4">
-                                        <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-                                            <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Matrix: {viewMode === 'month' ? `${MONTH_ORDER[viewMonth]} ${selectedYears[0]}` : (selectedYears.includes('All Years') ? 'Portfolio Baseline' : selectedYears.join(' + '))}</span>
+                    <div className="grid grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
+                        {/* MAIN DASHBOARD HEADER */}
+                        <PageHeader 
+                            icon={<LayoutDashboard size={32} />}
+                            title={<>Strategic <br /><span className="text-blue-600 dark:text-blue-500 animate-pulse">Wealth.</span></>}
+                            subtitle="Universal Asset Intelligence Matrix"
+                            badges={[
+                                { 
+                                    label: `Active Matrix: ${viewMode === 'month' ? `${MONTH_ORDER[viewMonth]} ${selectedYears[0]}` : (selectedYears.includes('All Years') ? 'Portfolio Baseline' : selectedYears.join(' + '))}`,
+                                    color: 'bg-blue-600/10 border border-blue-600/20',
+                                    textColor: 'text-blue-600',
+                                    pulse: true
+                                },
+                                { label: `Stream: ${selectedSource.includes('All Sources') ? 'Total Portfolio' : selectedSource.join(' + ')}` }
+                            ]}
+                            filters={
+                                <div className="flex flex-row items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-2 md:pb-0">
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                        <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
+                                            <CreditCard size={16} className="text-blue-600 dark:text-blue-400" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Source</span>
                                         </div>
-                                        <div className="px-4 py-1.5 rounded-full bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center gap-2 shadow-sm">
-                                            <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Stream: {selectedSource.includes('All Sources') ? 'Total Portfolio' : selectedSource.join(' + ')}</span>
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.6em] ml-1 mt-4">Universal Asset Intelligence Matrix</p>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col md:flex-row items-start md:items-end gap-4 order-1 xl:order-2 w-full md:w-auto">
-                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
-                                    <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
-                                        <CreditCard size={16} className="text-blue-600 dark:text-blue-400" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Source</span>
-                                    </div>
-                                    <MultiSelectDropdown 
-                                        options={['All Sources', ...allSources]} 
-                                        selected={selectedSource} 
-                                        onChange={setSelectedSource} 
-                                        label="" 
-                                    />
-                                </div>
-
-                                <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
-                                    {viewMode === 'month' ? (
-                                        <>
-                                            <button onClick={() => setViewMode('year')} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">Monthly</button>
-                                            <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
-                                            <CustomDropdown value={viewMonth} onChange={(m) => { setViewMonth(m); setCalendarMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: MONTH_ORDER[i] }))} />
-                                        </>
-                                    ) : (
-                                        <button onClick={() => setViewMode('month')} className="px-10 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-[0_20px_50px_rgba(37,99,235,0.3)] transition-all hover:scale-105 active:scale-95">Annual Overview</button>
-                                    )}
-                                    <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
-                                    {viewMode === 'month' ? (
-                                        <CustomDropdown 
-                                            value={selectedYears[0]} 
-                                            onChange={(y) => { setSelectedYears([y]); setCalendarYear(y); }} 
-                                            options={Array.from({length: 10}, (_, i) => ({ value: today.getFullYear() - 5 + i, label: (today.getFullYear() - 5 + i).toString() }))} 
-                                        />
-                                    ) : (
                                         <MultiSelectDropdown 
-                                            options={['All Years', ...Array.from({length: 10}, (_, i) => today.getFullYear() - 5 + i)]} 
-                                            selected={selectedYears} 
-                                            onChange={(years) => { setSelectedYears(years); if (years.length === 1 && typeof years[0] === 'number') setCalendarYear(years[0]); }} 
+                                            options={['All Sources', ...allSources]} 
+                                            selected={selectedSource} 
+                                            onChange={setSelectedSource} 
                                             label="" 
                                         />
-                                    )}
+                                    </div>
+
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                        {viewMode === 'month' ? (
+                                            <>
+                                                <button onClick={() => setViewMode('year')} className="px-3 md:px-8 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">MM</button>
+                                                <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-1 md:mx-2"></div>
+                                                <CustomDropdown value={viewMonth} onChange={(m) => { setViewMonth(m); setCalendarMonth(m); }} options={Array.from({length: 12}, (_, i) => ({ value: i, label: MONTH_ORDER[i].substring(0, 3) }))} />
+                                            </>
+                                        ) : (
+                                            <button onClick={() => setViewMode('month')} className="px-4 md:px-10 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-lg transition-all hover:scale-105 active:scale-95 shrink-0">Annual</button>
+                                        )}
+                                        <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-1 md:mx-2"></div>
+                                        {viewMode === 'month' ? (
+                                            <CustomDropdown 
+                                                value={selectedYears[0]} 
+                                                onChange={(y) => { setSelectedYears([y]); setCalendarYear(y); }} 
+                                                options={Array.from({length: 10}, (_, i) => ({ value: today.getFullYear() - 5 + i, label: (today.getFullYear() - 5 + i).toString() }))} 
+                                            />
+                                        ) : (
+                                            <MultiSelectDropdown 
+                                                options={['All Years', ...Array.from({length: 10}, (_, i) => today.getFullYear() - 5 + i)]} 
+                                                selected={selectedYears} 
+                                                onChange={(years) => { setSelectedYears(years); if (years.length === 1 && typeof years[0] === 'number') setCalendarYear(years[0]); }} 
+                                                label="" 
+                                            />
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
+                            }
+                        />
 
                         {/* MAIN DASHBOARD CONTENT */}
-                        <div className="lg:col-span-8 space-y-10">
+                        <div className="col-span-12 3xl:col-span-6 space-y-10">
                             {/* TOP METRIC PILLS - ALIGNED LEFT WITH CONTENT */}
                             <div className="flex flex-wrap gap-6 w-full">
                                 <MetricCapsule label="Revenue Stream" amount={earned} icon={<TrendingUp size={28}/>} color="text-emerald-500 dark:text-emerald-400" bgColor="bg-emerald-50/50 dark:bg-emerald-500/5" borderColor="border-emerald-100 dark:border-emerald-500/20" onClick={() => openDrilldown('type', 'income', statsPrefix, 'Income Details')} />
@@ -1671,7 +1669,7 @@ function App() {
                         </div>
 
                         {/* RIGHT SIDEBAR: CALENDAR & ACTIVITY */}
-                        <div className="lg:col-span-4 space-y-10">
+                        <div className="col-span-12 3xl:col-span-6 space-y-10">
                             <div className="sticky top-8 space-y-10">
                                 {/* MINI CALENDAR CARD */}
                                 <div className="bg-white dark:bg-white/[0.03] backdrop-blur-3xl rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-100 dark:border-white/5 group overflow-hidden transition-all duration-700 h-full">
@@ -1820,10 +1818,12 @@ function App() {
                 {/* COMBINED ACTIVITY TAB */}
                 {activeTab === 'activity' && (
                     <div className="max-w-4xl mx-auto space-y-12 animate-fade-in py-20 px-4">
-                        <div className="text-center space-y-4">
-                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Activity <br/><span className="text-blue-600">Nexus.</span></h2>
-                            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">Operational Entry Protocol</p>
-                        </div>
+                        <PageHeader 
+                            icon={<PlusCircle size={32} />}
+                            title={<>Activity <br/><span className="text-blue-600">Nexus.</span></>}
+                            subtitle="Operational Entry Protocol"
+                            badges={[{ label: "System Ready", color: "bg-emerald-500/10 border border-emerald-500/20", textColor: "text-emerald-600", pulse: true, pulseColor: "bg-emerald-500" }]}
+                        />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {/* MANUAL ENTRY CARD */}
@@ -1870,65 +1870,63 @@ function App() {
 
                 {activeTab === 'history' && (
                     <div className="space-y-12 animate-fade-in py-10 relative z-10">
-                        <div className="flex flex-col md:flex-row justify-between items-end gap-8 mb-4 relative z-[100]">
-                                                        <div className="space-y-4">
-                                                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white uppercase tracking-tighter leading-none">Chronicle <br/><span className="text-blue-600">Archive.</span></h2>
-                                                            {historyViewMode === 'calendar' && (
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="px-4 py-1.5 rounded-full bg-blue-600/10 border border-blue-600/20 flex items-center gap-2 shadow-sm">
-                                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
-                                                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Stream: {selectedSource.includes('All Sources') ? 'Consolidated Archive' : selectedSource.join(' + ')}</span>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1">Historical Data Stream</p>
-                                                        </div>
-                                                        <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                                                            {historyViewMode === 'list' && (
-                                                                <div className="relative flex-1 md:w-80">
-                                                                    <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" size={18} />
-                                                                    <input 
-                                                                        type="text" 
-                                                                        placeholder="Search archive matrix..." 
-                                                                        value={historySearch}
-                                                                        onChange={(e) => setHistorySearch(e.target.value)}
-                                                                        className="w-full pl-12 pr-4 py-4 bg-white dark:bg-white/[0.03] backdrop-blur-xl border border-gray-100 dark:border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-xl dark:text-white"
-                                                                    />
-                                                                    {historySearch && (
-                                                                        <button onClick={() => setHistorySearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors">
-                                                                            <X size={16} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            
-                                                            <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-1.5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-inner transition-all group hover:border-blue-500/30">
-                                                                <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
-                                                                    <CreditCard size={14} className="text-blue-600 dark:text-blue-400" />
-                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Source</span>
-                                                                </div>
-                                                                <MultiSelectDropdown 
-                                                                    options={['All Sources', ...allSources]} 
-                                                                    selected={selectedSource} 
-                                                                    onChange={setSelectedSource} 
-                                                                    label="" 
-                                                                />
-                                                            </div>
-                            
-                                                            <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-2xl border border-gray-200 dark:border-white/5 shadow-inner transition-all">                                                                <button 
-                                                                    onClick={() => setHistoryViewMode('list')}
-                                                                    className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-xl text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-                                                                >
-                                                                    List View
-                                                                </button>
-                                                                <button 
-                                                                    onClick={() => setHistoryViewMode('calendar')}
-                                                                    className={`flex-1 md:flex-none px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'calendar' ? 'bg-white dark:bg-gray-600 shadow-xl text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
-                                                                >
-                                                                    Calendar View
-                                                                </button>
-                                                            </div>
-                                                        </div>                        </div>
+                        <PageHeader 
+                            icon={<History size={32} />}
+                            title={<>Chronicle <br/><span className="text-blue-600">Archive.</span></>}
+                            subtitle="Historical Data Stream"
+                            badges={historyViewMode === 'calendar' ? [
+                                { 
+                                    label: `Active Stream: ${selectedSource.includes('All Sources') ? 'Consolidated Archive' : selectedSource.join(' + ')}`,
+                                    color: 'bg-blue-600/10 border border-blue-600/20',
+                                    textColor: 'text-blue-600',
+                                    pulse: true
+                                }
+                            ] : []}
+                            filters={
+                                <>
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] shrink-0 group hover:border-blue-500/30 transition-all">
+                                        <div className="flex items-center">
+                                            <div className="px-3 md:px-4 text-gray-400"><Hash size={16} /></div>
+                                            <input 
+                                                type="text" 
+                                                placeholder={historySearch ? historySearch : "Search..."}
+                                                value={historySearch}
+                                                onChange={(e) => setHistorySearch(e.target.value)}
+                                                className="w-20 md:w-48 bg-transparent text-[10px] font-black uppercase tracking-widest outline-none dark:text-white"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-1.5 rounded-xl md:rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm transition-all group hover:border-blue-500/30 shrink-0">
+                                        <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
+                                            <CreditCard size={14} className="text-blue-600 dark:text-blue-400" />
+                                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Source</span>
+                                        </div>
+                                        <MultiSelectDropdown 
+                                            options={['All Sources', ...allSources]} 
+                                            selected={selectedSource} 
+                                            onChange={setSelectedSource} 
+                                            label="" 
+                                        />
+                                    </div>
+    
+                                    <div className="flex bg-gray-100 dark:bg-white/5 p-0.5 md:p-1.5 rounded-xl md:rounded-2xl border border-gray-200 dark:border-white/5 shadow-sm transition-all shrink-0">
+                                        <button 
+                                            onClick={() => setHistoryViewMode('list')}
+                                            className={`px-3 md:px-8 py-2 md:py-3 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-md text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}
+                                        >
+                                            List
+                                        </button>
+                                        <button 
+                                            onClick={() => setHistoryViewMode('calendar')}
+                                            className={`px-3 md:px-8 py-2 md:py-3 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all ${historyViewMode === 'calendar' ? 'bg-white dark:bg-gray-600 shadow-md text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}
+                                        >
+                                            Cal
+                                        </button>
+                                    </div>
+                                </>
+                            }
+                        />
 
                         {historyViewMode === 'calendar' ? (
                             <div className="relative group/cal">
@@ -2342,7 +2340,7 @@ function App() {
                     };
 
                     return (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
+                        <div className="grid grid-cols-12 gap-10 animate-fade-in pb-20 relative z-10">
                             {/* HEADER */}
                             <div className="lg:col-span-12 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-10 mb-2 relative z-[100]">
                                 <div className="space-y-4">
@@ -2386,16 +2384,15 @@ function App() {
                                         </button>
                                     ) : null}
 
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
-                                        <div className="flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
-                                            <Globe size={16} className="text-blue-600 dark:text-blue-400" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
-                                        </div>
-                                        <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
-                                    </div>
-
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 backdrop-blur-3xl p-2 rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
-                                        {indiaViewMode === 'month' ? (
+                                                                            <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">
+                                                                                <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
+                                                                                    <Globe size={16} className="text-blue-600 dark:text-blue-400" />
+                                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
+                                                                                </div>
+                                                                                <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
+                                                                            </div>
+                                    
+                                                                            <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full md:w-fit group hover:border-blue-500/30 transition-all duration-500">                                        {indiaViewMode === 'month' ? (
                                             <>
                                                 <button onClick={() => setIndiaViewMode('year')} className="px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">Monthly</button>
                                                 <div className="w-px bg-gray-200 dark:bg-white/10 my-2 mx-2"></div>
@@ -2419,34 +2416,34 @@ function App() {
                             </div>
 
                             {/* CONTENT */}
-                            <div className="lg:col-span-8 space-y-10">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                    <div className="bg-indigo-600 dark:bg-indigo-600 p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02]">
+                            <div className="col-span-12 3xl:col-span-6 space-y-10">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+                                    <div className="bg-indigo-600 dark:bg-indigo-600 p-4 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10">
-                                            <p className="text-[10px] font-black text-indigo-100 uppercase tracking-[0.4em] mb-4">Capital Deployed (USD)</p>
-                                            <p className="text-5xl font-black text-white tracking-tighter">${totalUSD.toLocaleString()}</p>
+                                            <p className="text-[8px] md:text-[10px] font-black text-indigo-100 uppercase tracking-[0.2em] md:tracking-[0.4em] mb-2 md:mb-4 truncate">Capital Deployed (USD)</p>
+                                            <p className="text-2xl md:text-5xl font-black text-white tracking-tighter truncate">${totalUSD.toLocaleString()}</p>
                                         </div>
                                         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-                                        <div className="absolute top-0 right-0 p-8 opacity-20"><TrendingUp size={48} className="text-white" /></div>
+                                        <div className="absolute top-0 right-0 p-8 opacity-20 hidden md:block"><TrendingUp size={48} className="text-white" /></div>
                                     </div>
 
-                                    <div className="bg-emerald-600 dark:bg-emerald-600 p-10 rounded-[3rem] shadow-[0_20px_50px_rgba(16,185,129,0.3)] relative overflow-hidden group border border-emerald-500/20 transition-all hover:scale-[1.02]">
+                                    <div className="bg-emerald-600 dark:bg-emerald-600 p-4 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(16,185,129,0.3)] relative overflow-hidden group border border-emerald-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10">
-                                            <p className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.4em] mb-4">Received Value (INR)</p>
-                                            <p className="text-5xl font-black text-white tracking-tighter">{formatINR(totalINR)}</p>
-                                            <div className="mt-4 text-emerald-100/60 text-[10px] font-black uppercase tracking-[0.2em]">₹{totalINR.toLocaleString('en-IN')}</div>
+                                            <p className="text-[8px] md:text-[10px] font-black text-emerald-100 uppercase tracking-[0.2em] md:tracking-[0.4em] mb-2 md:mb-4 truncate">Received Value (INR)</p>
+                                            <p className="text-2xl md:text-5xl font-black text-white tracking-tighter truncate">{formatINR(totalINR)}</p>
+                                            <div className="mt-2 md:mt-4 text-emerald-100/60 text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] truncate">₹{totalINR.toLocaleString('en-IN')}</div>
                                         </div>
                                         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-                                        <div className="absolute top-0 right-0 p-8 opacity-20"><CreditCard size={48} className="text-white" /></div>
+                                        <div className="absolute top-0 right-0 p-8 opacity-20 hidden md:block"><CreditCard size={48} className="text-white" /></div>
                                     </div>
 
-                                    <div className="bg-slate-900 dark:bg-white/5 backdrop-blur-3xl p-10 rounded-[3rem] shadow-2xl relative overflow-hidden group border border-slate-800 dark:border-white/10 transition-all hover:scale-[1.02]">
+                                    <div className="bg-slate-900 dark:bg-white/5 backdrop-blur-3xl p-4 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-lg md:shadow-2xl relative overflow-hidden group border border-slate-800 dark:border-white/10 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10 flex flex-col justify-center h-full">
-                                            <p className="text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.4em] mb-4">Avg Efficiency</p>
-                                            <p className="text-5xl font-black text-white tracking-tighter">₹{avgRate.toFixed(2)}</p>
-                                            <div className="mt-4 text-slate-500 text-[10px] font-bold uppercase tracking-widest">{activeTxs.length} Strategic Transfers</div>
+                                            <p className="text-[8px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.2em] md:tracking-[0.4em] mb-2 md:mb-4 truncate">Avg Efficiency</p>
+                                            <p className="text-2xl md:text-5xl font-black text-white tracking-tighter truncate">₹{avgRate.toFixed(2)}</p>
+                                            <div className="mt-2 md:mt-4 text-slate-500 text-[8px] md:text-[10px] font-bold uppercase tracking-widest truncate">{activeTxs.length} Strategic Transfers</div>
                                         </div>
-                                        <div className="absolute top-0 right-0 p-8 opacity-10"><Zap size={48} className="text-white" /></div>
+                                        <div className="absolute top-0 right-0 p-8 opacity-10 hidden md:block"><Zap size={48} className="text-white" /></div>
                                     </div>
                                 </div>
 
@@ -2533,7 +2530,7 @@ function App() {
                                 </div>
                             </div>
 
-                            <div className="lg:col-span-4 space-y-10">
+                            <div className="col-span-12 3xl:col-span-6 space-y-10">
                                 <div className="sticky top-8 space-y-6">
                                     <div className="flex justify-between items-center px-4">
                                         <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Transfer Ledger</h3>
@@ -3316,16 +3313,16 @@ const MultiSelectDropdown = ({ options, selected, onChange }) => {
     }, [selected]);
 
     return (
-        <div className="relative" ref={ref}>
-            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gray-100/50 dark:bg-white/5 hover:bg-gray-200/50 dark:hover:bg-white/10 border border-gray-200/50 dark:border-white/10 font-black text-gray-600 dark:text-gray-400 text-[10px] uppercase tracking-widest transition-all shadow-sm group min-w-[140px] justify-between">
+        <div className="relative z-[50]" ref={ref}>
+            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-3 px-3 md:px-4 py-2 md:py-2.5 rounded-xl bg-gray-100/50 dark:bg-white/5 hover:bg-gray-200/50 dark:hover:bg-white/10 border border-gray-200/50 dark:border-white/10 font-black text-gray-600 dark:text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest transition-all shadow-sm group min-w-0 md:min-w-[140px] justify-between">
                 <div className="flex items-center gap-2">
-                    <Filter size={14} className="group-hover:text-blue-600 transition-colors"/> 
-                    <span>{displayLabel}</span>
+                    <Filter size={12} className="group-hover:text-blue-600 transition-colors hidden md:block"/> 
+                    <span className="truncate max-w-[80px] md:max-w-none">{displayLabel}</span>
                 </div>
-                <ChevronDown size={14} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
+                <ChevronDown size={12} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
             </button>
             {isOpen && (
-                <div className="absolute top-full right-0 mt-3 w-56 bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/10 max-h-72 overflow-y-auto z-[9999] p-2 animate-in fade-in zoom-in duration-200 backdrop-blur-3xl">
+                <div className="absolute top-full right-0 mt-3 w-56 bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-white/10 max-h-72 overflow-y-auto z-[99999] p-2 animate-in fade-in zoom-in duration-200 backdrop-blur-3xl">
                     {options.map(opt => (
                         <div key={opt} onClick={() => toggleOption(opt)} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-all mb-1 last:mb-0 group">
                             <div className="w-2.5 h-2.5 rounded-full shadow-sm shrink-0" style={{backgroundColor: stringToColor(opt)}}></div>
@@ -3405,37 +3402,37 @@ const CalendarHistory = ({ transactions, selectedDate, setSelectedDate, calendar
             <div 
                 key={d} 
                 onClick={() => { setSelectedDate(dateStr); setShowDayPopup(true); }}
-                className={`h-24 ${isMini ? 'md:h-28' : 'md:h-32'} p-3 md:p-4 rounded-[2rem] cursor-pointer transition-all duration-500 flex flex-col justify-between relative group border shadow-sm ${isSelected ? 'bg-blue-600 dark:bg-blue-600 border-blue-600 z-10 scale-[1.05] shadow-[0_20px_50px_rgba(37,99,235,0.3)]' : 'bg-white dark:bg-white/[0.03] backdrop-blur-xl border-gray-100 dark:border-white/5 hover:border-blue-500/50 hover:shadow-2xl hover:-translate-y-1'}`}
+                className={`h-24 ${isMini ? 'md:h-28' : 'md:h-32'} p-2 md:p-3 rounded-[2rem] cursor-pointer transition-all duration-500 flex flex-col justify-between relative group border shadow-sm ${isSelected ? 'bg-blue-600 dark:bg-blue-600 border-blue-600 z-10 scale-[1.05] shadow-[0_20px_50px_rgba(37,99,235,0.3)]' : 'bg-white dark:bg-white/[0.03] backdrop-blur-xl border-gray-100 dark:border-white/5 hover:border-blue-500/50 hover:shadow-2xl hover:-translate-y-1'}`}
             >
                 <div className="flex justify-between items-start">
-                    <span className={`text-sm font-black transition-all ${isSelected ? 'text-white' : (isToday ? 'bg-blue-600 text-white w-8 h-8 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400')}`}>{d}</span>
+                    <span className={`text-xs md:text-sm font-black transition-all ${isSelected ? 'text-white' : (isToday ? 'bg-blue-600 text-white w-6 h-6 md:w-8 md:h-8 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30' : 'text-gray-400 dark:text-gray-500 group-hover:text-blue-600 dark:group-hover:text-blue-400')}`}>{d}</span>
                     {dayTransactions.length > 0 && (
                         <div className="flex gap-1">
                             {unlistedCount > 0 && (
-                                <div title={`${unlistedCount} Excluded`} className={`w-2 h-2 rounded-full mt-1 ${isSelected ? 'bg-white/40' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                <div title={`${unlistedCount} Excluded`} className={`w-1.5 h-1.5 rounded-full mt-1 ${isSelected ? 'bg-white/40' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
                             )}
                             {!isMini && (
-                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-all ${isSelected ? 'bg-white/20 border-white/20 text-white' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-500 dark:text-gray-400'}`}>
-                                    <span className="text-[10px] font-black">{dayTransactions.length}</span>
+                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg border transition-all ${isSelected ? 'bg-white/20 border-white/20 text-white' : 'bg-gray-50 dark:bg-white/5 border-gray-100 dark:border-white/5 text-gray-500 dark:text-gray-400'}`}>
+                                    <span className="text-[8px] font-black">{dayTransactions.length}</span>
                                 </div>
                             )}
                         </div>
                     )}
                 </div>
                 
-                <div className="flex flex-col gap-1 mt-auto overflow-hidden">
+                <div className="flex flex-col gap-0.5 mt-auto overflow-hidden">
                     {(dayIncome > 0 || dayExpense > 0) && (
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-bottom-1 duration-500">
                             {dayIncome > 0 && (
-                                <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-lg border border-transparent">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'} shadow-sm shrink-0`}></div>
-                                    <div className={`text-[9px] md:text-[10px] font-black truncate ${isSelected ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatCurrency(dayIncome)}</div>
+                                <div className="flex items-center gap-1 px-1 py-0.5 rounded-lg border border-transparent">
+                                    <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'} shadow-sm shrink-0`}></div>
+                                    <div className={`text-[8px] md:text-[9px] font-black truncate ${isSelected ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>{formatCurrency(dayIncome)}</div>
                                 </div>
                             )}
                             {dayExpense > 0 && (
-                                <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-lg border border-transparent">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-rose-500'} shadow-sm shrink-0`}></div>
-                                    <div className={`text-[9px] md:text-[10px] font-black truncate ${isSelected ? 'text-white' : 'text-rose-600 dark:text-rose-400'}`}>{formatCurrency(dayExpense)}</div>
+                                <div className="flex items-center gap-1 px-1 py-0.5 rounded-lg border border-transparent">
+                                    <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-rose-500'} shadow-sm shrink-0`}></div>
+                                    <div className={`text-[8px] md:text-[9px] font-black truncate ${isSelected ? 'text-white' : 'text-rose-600 dark:text-rose-400'}`}>{formatCurrency(dayExpense)}</div>
                                 </div>
                             )}
                         </div>
@@ -3522,13 +3519,13 @@ const CalendarHistory = ({ transactions, selectedDate, setSelectedDate, calendar
                     </div>
                 </div>
                 
-                <div className={`${isMini ? 'p-4' : 'p-8'}`}>
-                    <div className="grid grid-cols-7 gap-4 mb-6 px-4">
+                <div className={`${isMini ? 'p-2 md:p-4' : 'p-4 md:p-8'}`}>
+                    <div className="grid grid-cols-7 gap-1 md:gap-4 mb-6 px-4">
                         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                            <div key={day} className="text-center text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">{day}</div>
+                            <div key={day} className="text-center text-[8px] md:text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.3em]">{day}</div>
                         ))}
                     </div>
-                    <div className="grid grid-cols-7 gap-4">
+                    <div className="grid grid-cols-7 gap-1 md:gap-4">
                         {days}
                     </div>
                 </div>
@@ -3849,13 +3846,13 @@ const CustomDropdown = ({ value, onChange, options }) => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
     return (
-        <div className="relative" ref={ref}>
-            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gray-100/50 dark:bg-white/5 hover:bg-gray-200/50 dark:hover:bg-white/10 font-black text-[10px] uppercase tracking-widest text-gray-700 dark:text-gray-200 min-w-[120px] justify-between transition-all border border-gray-200/50 dark:border-white/10 shadow-sm group">
-                {options.find(o => o.value === value)?.label} 
-                <ChevronDown size={14} className={`text-gray-400 group-hover:text-blue-600 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
+        <div className="relative z-[50]" ref={ref}>
+            <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-xl bg-gray-100/50 dark:bg-white/5 hover:bg-gray-200/50 dark:hover:bg-white/10 font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 dark:text-gray-200 min-w-0 md:min-w-[120px] justify-between transition-all border border-gray-200/50 dark:border-white/10 shadow-sm group">
+                <span className="truncate max-w-[80px] md:max-w-none">{options.find(o => o.value === value)?.label}</span>
+                <ChevronDown size={12} className={`text-gray-400 group-hover:text-blue-600 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
             </button>
             {isOpen && (
-                <div className="absolute top-full mt-3 right-0 w-48 bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-white/10 max-h-64 overflow-y-auto z-[10000] p-2 animate-in fade-in zoom-in duration-200 backdrop-blur-3xl">
+                <div className="absolute top-full mt-3 right-0 w-48 bg-white dark:bg-[#0a0a0a] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-gray-100 dark:border-white/10 max-h-64 overflow-y-auto z-[99999] p-2 animate-in fade-in zoom-in duration-200 backdrop-blur-3xl">
                     {options.map(opt => (
                         <button key={opt.value} onClick={() => { onChange(opt.value); setIsOpen(false); }} className={`w-full text-left px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all mb-1 last:mb-0 ${value === opt.value ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-blue-600'}`}>{opt.label}</button>
                     ))}
@@ -4343,20 +4340,54 @@ const SidebarItem = ({ icon, label, active, onClick }) => (
     </button> 
 );
 
+const PageHeader = ({ icon, title, subtitle, badges = [], actions = [], filters = null }) => (
+    <div className="col-span-12 flex flex-col 3xl:flex-row justify-between items-start 3xl:items-end gap-10 mb-2 relative z-[100] w-full">
+        <div className="space-y-4">
+            <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-600 rounded-[2rem] flex items-center justify-center text-white shadow-2xl shadow-blue-600/20">
+                    {icon}
+                </div>
+                <div>
+                    <h2 className="text-4xl md:text-5xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">{title}</h2>
+                </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 mt-4">
+                {badges.map((badge, i) => (
+                    <div key={i} className={`px-4 py-1.5 rounded-full ${badge.color || 'bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10'} flex items-center gap-2 shadow-sm`}>
+                        {badge.pulse && <div className={`w-1.5 h-1.5 rounded-full ${badge.pulseColor || 'bg-blue-600'} animate-pulse`}></div>}
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${badge.textColor || 'text-gray-500 dark:text-gray-400'}`}>{badge.label}</span>
+                    </div>
+                ))}
+            </div>
+            <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em] ml-1 mt-4">{subtitle}</p>
+            <div className="flex flex-wrap gap-4 mt-8">
+                {actions.map((action, i) => (
+                    <button key={i} onClick={action.onClick} className={`px-8 py-4 ${action.className || 'bg-gray-900 dark:bg-white text-white dark:text-black'} rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2`}>
+                        {action.icon} {action.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+        <div className="flex flex-row items-center gap-2 order-1 xl:order-2 w-full md:w-auto overflow-visible pb-2 md:pb-0">
+            {filters}
+        </div>
+    </div>
+);
+
 const MetricCapsule = ({ label, amount, color, icon, bgColor, borderColor, onClick }) => {
     const isEmerald = color.includes('emerald');
     const isRose = color.includes('rose');
     const lineBg = isEmerald ? 'bg-emerald-500' : (isRose ? 'bg-rose-500' : 'bg-blue-600');
     
     return (
-        <div onClick={onClick} className={`flex-1 min-w-[280px] ${bgColor} backdrop-blur-3xl border-2 ${borderColor} px-12 py-8 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] cursor-pointer group transition-all hover:scale-[1.08] hover:shadow-[0_30px_70px_rgba(0,0,0,0.2)] relative overflow-hidden active:scale-95`}>
-            <div className="absolute right-[-15px] top-[-15px] opacity-10 group-hover:scale-150 transition-all duration-1000 group-hover:rotate-12">{icon}</div>
+        <div onClick={onClick} className={`flex-1 min-w-[240px] md:min-w-[280px] ${bgColor} backdrop-blur-3xl border-2 ${borderColor} px-6 md:px-12 py-6 md:py-8 rounded-[2.5rem] md:rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] cursor-pointer group transition-all hover:scale-[1.05] hover:shadow-[0_30px_70px_rgba(0,0,0,0.2)] relative overflow-hidden active:scale-95`}>
+            <div className="absolute right-[-15px] top-[-15px] opacity-10 group-hover:scale-150 transition-all duration-1000 group-hover:rotate-12 hidden md:block">{icon}</div>
             <div className="relative z-10 space-y-2">
                 <div className="flex items-center gap-3">
-                    <div className={`${color} group-hover:scale-110 transition-transform`}>{icon}</div>
-                    <p className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.4em]">{label}</p>
+                    <div className={`${color} group-hover:scale-110 transition-transform scale-75 md:scale-100`}>{icon}</div>
+                    <p className="text-[9px] md:text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] md:tracking-[0.4em] truncate">{label}</p>
                 </div>
-                <p className={`text-5xl font-black tracking-tighter ${color} leading-none`}>${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                <p className={`text-3xl md:text-5xl font-black tracking-tighter ${color} leading-none truncate`}>${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
             </div>
             <div className={`absolute bottom-0 left-0 h-2 ${lineBg} opacity-0 group-hover:opacity-100 transition-all duration-500 w-0 group-hover:w-full`}></div>
         </div>
