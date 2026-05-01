@@ -19,7 +19,8 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 
-// --- PASTE YOUR FIREBASE CONFIG OBJECT BELOW ---
+// Firebase configuration using environment variables for security.
+// Ensure VITE_FIREBASE_* variables are set in your .env file.
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -29,6 +30,8 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
+console.log("Firebase Config check (API Key exists):", !!firebaseConfig.apiKey, "Auth Domain:", firebaseConfig.authDomain);
+
 // ------------------------------------------------
 
 const app = initializeApp(firebaseConfig);

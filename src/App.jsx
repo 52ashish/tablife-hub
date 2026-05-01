@@ -247,7 +247,19 @@ function App() {
     });
   };
 
-  const handleLogin = async () => { try { await signInWithPopup(auth, provider); } catch (e) { console.error(e); } };
+  let isLoginLocked = false;
+  const handleLogin = async () => { 
+      if (isLoginLocked) return;
+      isLoginLocked = true;
+      try { 
+          await signInWithPopup(auth, provider); 
+      } catch (e) { 
+          console.error(e); 
+          alert("Login Error: " + e.message + " (Code: " + e.code + ")"); 
+      } finally {
+          isLoginLocked = false;
+      }
+  };
 
   const toggleSelectTx = (id) => {
       setSelectedTxIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -1366,8 +1378,8 @@ function App() {
                                 { label: `Stream: ${selectedSource.includes('All Sources') ? 'Total Portfolio' : selectedSource.join(' + ')}` }
                             ]}
                             filters={
-                                <div className="flex flex-row items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-2 md:pb-0">
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                <div className="flex flex-row flex-wrap items-center gap-2 w-full md:w-auto overflow-visible pb-2 md:pb-0">
+                                    <div className="relative z-[60] flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
                                         <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
                                             <CreditCard size={16} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Source</span>
@@ -1380,7 +1392,7 @@ function App() {
                                         />
                                     </div>
 
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                    <div className="relative z-[50] flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
                                         {viewMode === 'month' ? (
                                             <>
                                                 <button onClick={() => setViewMode('year')} className="px-3 md:px-8 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">MM</button>
@@ -1880,7 +1892,7 @@ function App() {
                             ] : []}
                             filters={
                                 <>
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] shrink-0 group hover:border-blue-500/30 transition-all">
+                                    <div className="relative z-[60] flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] shrink-0 group hover:border-blue-500/30 transition-all">
                                         <div className="flex items-center">
                                             <div className="px-3 md:px-4 text-gray-400"><Hash size={16} /></div>
                                             <input 
@@ -1893,7 +1905,7 @@ function App() {
                                         </div>
                                     </div>
                                     
-                                    <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-1.5 rounded-xl md:rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm transition-all group hover:border-blue-500/30 shrink-0">
+                                    <div className="relative z-[50] flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-1.5 rounded-xl md:rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm transition-all group hover:border-blue-500/30 shrink-0">
                                         <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
                                             <CreditCard size={14} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Source</span>
@@ -2358,7 +2370,7 @@ function App() {
                                     { icon: <History size={16}/>, label: 'Audit Log', onClick: () => setShowIndiaAuditModal(true), className: 'bg-purple-600 text-white shadow-purple-600/20' }
                                 ]}
                                 filters={
-                                    <div className="flex flex-row items-center gap-2 w-full md:w-auto overflow-x-auto no-scrollbar pb-2 md:pb-0">
+                                    <div className="flex flex-row flex-wrap items-center gap-2 w-full md:w-auto overflow-visible pb-2 md:pb-0">
                                         {indiaViewMode === 'month' || !indiaSelectedYears.includes('All Years') ? (
                                             <button 
                                                 onClick={() => {
@@ -2372,7 +2384,7 @@ function App() {
                                             </button>
                                         ) : null}
 
-                                        <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                        <div className="relative z-[60] flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
                                             <div className="hidden md:flex items-center gap-2 px-4 border-r border-gray-200 dark:border-white/10 mr-2">
                                                 <Globe size={16} className="text-blue-600 dark:text-blue-400" />
                                                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Recipient</span>
@@ -2380,7 +2392,7 @@ function App() {
                                             <CustomDropdown value={indiaViewRecipient} onChange={setIndiaViewRecipient} options={[{value: 'All Recipients', label: 'All Recipients'}, ...recipientsList.map(r => ({value: r, label: r}))]} />
                                         </div>
 
-                                        <div className="flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
+                                        <div className="relative z-[50] flex bg-gray-100/50 dark:bg-white/5 lg:backdrop-blur-3xl p-0.5 md:p-2 rounded-xl md:rounded-[2.5rem] border border-gray-200 dark:border-white/10 shadow-sm md:shadow-[0_8px_30px_rgb(0,0,0,0.04)] group hover:border-blue-500/30 transition-all duration-500 shrink-0">
                                             {indiaViewMode === 'month' ? (
                                                 <>
                                                     <button onClick={() => setIndiaViewMode('year')} className="px-3 md:px-8 py-2 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-all hover:bg-white/5">MM</button>
@@ -2411,7 +2423,7 @@ function App() {
                                     <div className="bg-indigo-600 dark:bg-indigo-600 p-6 md:p-10 rounded-[2.5xl] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(79,70,229,0.3)] relative overflow-hidden group border border-indigo-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10">
                                             <p className="text-[9px] md:text-[10px] font-black text-indigo-100 uppercase tracking-[0.3em] md:tracking-[0.4em] mb-2 md:mb-4">Capital Deployed (USD)</p>
-                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter whitespace-nowrap leading-none">${totalUSD.toLocaleString()}</p>
+                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter break-all leading-none">${totalUSD.toLocaleString()}</p>
                                         </div>
                                         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
                                         <div className="absolute top-0 right-0 p-8 opacity-20 hidden md:block"><TrendingUp size={48} className="text-white" /></div>
@@ -2420,8 +2432,8 @@ function App() {
                                     <div className="bg-emerald-600 dark:bg-emerald-600 p-6 md:p-10 rounded-[2.5xl] md:rounded-[3rem] shadow-lg md:shadow-[0_20px_50px_rgba(16,185,129,0.3)] relative overflow-hidden group border border-emerald-500/20 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10">
                                             <p className="text-[9px] md:text-[10px] font-black text-emerald-100 uppercase tracking-[0.3em] md:tracking-[0.4em] mb-2 md:mb-4">Received Value (INR)</p>
-                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter whitespace-nowrap leading-none">{formatINR(totalINR)}</p>
-                                            <div className="mt-2 md:mt-4 text-emerald-100/60 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap">₹{totalINR.toLocaleString('en-IN')}</div>
+                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter break-all leading-none">{formatINR(totalINR)}</p>
+                                            <div className="mt-2 md:mt-4 text-emerald-100/60 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] break-all">₹{totalINR.toLocaleString('en-IN')}</div>
                                         </div>
                                         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
                                         <div className="absolute top-0 right-0 p-8 opacity-20 hidden md:block"><CreditCard size={48} className="text-white" /></div>
@@ -2430,8 +2442,8 @@ function App() {
                                     <div className="bg-slate-900 dark:bg-white/5 backdrop-blur-3xl p-6 md:p-10 rounded-[2.5xl] md:rounded-[3rem] shadow-lg md:shadow-2xl relative overflow-hidden group border border-slate-800 dark:border-white/10 transition-all hover:scale-[1.02] flex flex-col justify-center min-w-0">
                                         <div className="relative z-10 flex flex-col justify-center h-full">
                                             <p className="text-[9px] md:text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-[0.3em] md:tracking-[0.4em] mb-2 md:mb-4">Avg Efficiency</p>
-                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter whitespace-nowrap leading-none">₹{avgRate.toFixed(2)}</p>
-                                            <div className="mt-2 md:mt-4 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest truncate">{activeTxs.length} Strategic Transfers</div>
+                                            <p className="text-3xl md:text-5xl font-black text-white tracking-tighter break-all leading-none">₹{avgRate.toFixed(2)}</p>
+                                            <div className="mt-2 md:mt-4 text-slate-500 text-[9px] md:text-[10px] font-bold uppercase tracking-widest break-words">{activeTxs.length} Strategic Transfers</div>
                                         </div>
                                         <div className="absolute top-0 right-0 p-8 opacity-10 hidden md:block"><Zap size={48} className="text-white" /></div>
                                     </div>
@@ -3303,7 +3315,7 @@ const MultiSelectDropdown = ({ options, selected, onChange }) => {
     }, [selected]);
 
     return (
-        <div className="relative z-[50]" ref={ref}>
+        <div className={`relative ${isOpen ? 'z-[100]' : 'z-[50]'}`} ref={ref}>
             <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-3 px-3 md:px-4 py-2 md:py-2.5 rounded-xl bg-gray-100/50 dark:bg-white/5 hover:bg-gray-200/50 dark:hover:bg-white/10 border border-gray-200/50 dark:border-white/10 font-black text-gray-600 dark:text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest transition-all shadow-sm group min-w-0 md:min-w-[140px] justify-between">
                 <div className="flex items-center gap-2">
                     <Filter size={12} className="group-hover:text-blue-600 transition-colors hidden md:block"/> 
@@ -3836,7 +3848,7 @@ const CustomDropdown = ({ value, onChange, options }) => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
     return (
-        <div className="relative z-[50]" ref={ref}>
+        <div className={`relative ${isOpen ? 'z-[100]' : 'z-[50]'}`} ref={ref}>
             <button onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-xl bg-gray-100/50 dark:bg-white/5 hover:bg-gray-200/50 dark:hover:bg-white/10 font-black text-[9px] md:text-[10px] uppercase tracking-widest text-gray-700 dark:text-gray-200 min-w-0 md:min-w-[120px] justify-between transition-all border border-gray-200/50 dark:border-white/10 shadow-sm group">
                 <span className="truncate max-w-[80px] md:max-w-none">{options.find(o => o.value === value)?.label}</span>
                 <ChevronDown size={12} className={`text-gray-400 group-hover:text-blue-600 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}/>
@@ -4380,7 +4392,7 @@ const MetricCapsule = ({ label, amount, color, icon, bgColor, borderColor, onCli
                     <div className={`${color} group-hover:scale-110 transition-transform scale-75 md:scale-100`}>{icon}</div>
                     <p className="text-[9px] md:text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] md:tracking-[0.4em] truncate">{label}</p>
                 </div>
-                <p className={`text-3xl md:text-5xl font-black tracking-tighter ${color} leading-none truncate`}>${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                <p className={`text-3xl md:text-5xl font-black tracking-tighter ${color} leading-none break-all`}>${amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
             </div>
             <div className={`absolute bottom-0 left-0 h-2 ${lineBg} opacity-0 group-hover:opacity-100 transition-all duration-500 w-0 group-hover:w-full`}></div>
         </div>
